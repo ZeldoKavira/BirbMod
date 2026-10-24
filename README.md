@@ -112,6 +112,11 @@ All options are on **Settings > Mods** in the game (F10 opens it directly).
   build points, each with base/bonus), drag it by its title. *Always show monster attack* (off by default): the attack
   label the game only shows while Shift is held (sword icon and number), drawn over every monster's health bar.
 
+- **parrotshop.js** - a PARROT tab in the shop sidebar (on/off in Mods) for spending the parrot's skill points on
+  Vitality, Recovery and Strength without opening the parrot menu: pick 1 point or 10/25/50/75% of what's available,
+  then the buy button spends that and MAX spends everything (hover MAX to preview). The tab's badge shows the points
+  waiting to be spent.
+
 - **speed.js** - game speed in Mods (0.25x-10x), through the
   game's own `debugGameSpeedMultiplier`, which it clamps to 0.25x-10x. Remembered between launches; unloading the mod
   puts 1x back. Wall-clock timers (offline earnings, cultivation) don't speed up, and progress made faster still counts
