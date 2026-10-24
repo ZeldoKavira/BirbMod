@@ -4,7 +4,23 @@ Mods for **Birb** (Steam). Birb is a Tauri app: the whole game is a web page run
 JavaScript injected into that page. `BirbLauncher.exe` starts the game with WebView2 remote debugging on a private
 local port, finds the game object, and loads every `.js` file in `mods/`.
 
-## Use
+## Install (any Windows PC with Birb from Steam)
+
+In PowerShell:
+
+```
+irm https://raw.githubusercontent.com/ZeldoKavira/BirbMod/main/install.ps1 | iex
+```
+
+It puts the launcher and mods in `%LOCALAPPDATA%\BirbMod\app` and adds a **Birb (Mods)** shortcut to the desktop and
+Start menu. Start the game with that shortcut. Each start, the launcher checks for a newer release and updates itself
+and the mods first. Run the line again to reinstall; delete `%LOCALAPPDATA%\BirbMod` and the shortcuts to remove it.
+Remote play is off on new installs (set `"enabled": true` in `%LOCALAPPDATA%\BirbMod\remote.json`).
+
+Releases: bump `<Version>` in `BirbLauncher.csproj`, commit, and push a matching tag `vX.Y.Z`; the release workflow
+builds `BirbMod-vX.Y.Z.zip` (launcher, mods, `update.json`, `files.txt`).
+
+## Use (development)
 
 Build once (needs the .NET SDK):
 
