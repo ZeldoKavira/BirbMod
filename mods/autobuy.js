@@ -675,8 +675,14 @@ if (typeof originalVisible === 'function') {
     game.renderCtxIsSunflowerUpgradeVisible = visibleWrapper;
     mod.onUnload(() => { if (game.renderCtxIsSunflowerUpgradeVisible === visibleWrapper) game.renderCtxIsSunflowerUpgradeVisible = originalVisible; });
 }
-const onField = () => performance.now() - lastFieldDraw < 300;
-const viewTree = () => (game.state.sunflowerTreeView === 'desert' ? 'desert' : 'field');
+// The same renderer also draws the mine's upgrade tree (its own map), so only the field's map counts; on the field,
+// the view is the base tree, the desert tree or the archivist's (which has no auto-buy).
+const FIELD_MAP = 1;
+const onField = () => game.currentMap === FIELD_MAP && performance.now() - lastFieldDraw < 300;
+const viewTree = () => {
+    const view = game.state.sunflowerTreeView;
+    return view === 'desert' ? 'desert' : view === 'archivist' ? null : 'field';
+};
 
 // Screen <-> world, the game's own mapping (canvas box, logical screen size, zoom, camera).
 function screenScale() {
@@ -695,6 +701,7 @@ function toClient(wx, wy) {
 
 function stationAt(cx, cy) {
     const w = toWorld(cx, cy), tree = viewTree();
+    if (!tree) return null;
     for (const st of game.sunflowerUpgradeStations || []) {
         if (treeOf(st.id) !== tree) continue;
         let visible = false;
@@ -746,8 +753,9 @@ let frame = 0;
 function drawBadges() {
     frame = requestAnimationFrame(drawBadges);
     let n = 0;
-    if (onField() && settings.picked.length) {
-        const picked = new Set(settings.picked), tree = viewTree();
+    const tree = onField() && settings.picked.length ? viewTree() : null;
+    if (tree) {
+        const picked = new Set(settings.picked);
         for (const st of game.sunflowerUpgradeStations || []) {
             if (!picked.has(st.id) || treeOf(st.id) !== tree) continue;
             let visible = false;
