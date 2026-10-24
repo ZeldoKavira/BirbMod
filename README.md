@@ -115,7 +115,8 @@ All options are on **Settings > Mods** in the game (F10 opens it directly).
 - **parrotshop.js** - a PARROT tab in the shop sidebar (on/off in Mods) for spending the parrot's skill points on
   Vitality, Recovery and Strength without opening the parrot menu: pick 1 point or 10/25/50/75% of what's available,
   then the buy button spends that and MAX spends everything (hover MAX to preview). The tab's badge shows the points
-  waiting to be spent.
+  waiting to be spent. EQUIPMENT opens the parrot menu's Equipment tab and CHESTS (with the openable count) opens the
+  chest-opening window.
 
 - **speed.js** - game speed in Mods (0.25x-10x), through the
   game's own `debugGameSpeedMultiplier`, which it clamps to 0.25x-10x. Remembered between launches; unloading the mod

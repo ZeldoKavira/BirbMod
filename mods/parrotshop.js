@@ -1,5 +1,6 @@
 // A PARROT tab in the shop sidebar (next to POPCORN / REBIRB / SEEDS / NEST) for spending the parrot's skill points
-// without opening the parrot menu: Vitality, Recovery and Strength, each with a buy button for the chosen amount
+// without opening the parrot menu, with buttons that open the parrot's Equipment tab and the chest-opening window:
+// Vitality, Recovery and Strength, each with a buy button for the chosen amount
 // (1 point or a share of what's available) and a MAX button that spends everything on it. The tab's badge shows the
 // points waiting to be spent. On/off from Settings > Mods.
 //
@@ -77,6 +78,10 @@ page.innerHTML = `
         <span style="font-size:14px;color:#566c86;font-family:var(--font-pixel-mono)">POINTS AVAILABLE</span>
         <span data-v="avail" style="font-size:20px;color:#f1c40f;font-family:var(--font-pixel-mono)">0</span>
     </div>
+    <div style="display:flex;gap:4px;margin-bottom:8px">
+        <button class="birb-btn secondary" data-open="gear" style="flex:1 1 0;padding:6px 0;font-size:14px;font-family:var(--font-pixel-mono)">EQUIPMENT</button>
+        <button class="birb-btn secondary" data-open="chests" style="flex:1 1 0;padding:6px 0;font-size:14px;font-family:var(--font-pixel-mono)">CHESTS <span data-v="chests"></span></button>
+    </div>
     <div data-v="amounts" style="display:flex;gap:4px;margin-bottom:8px"></div>
     ${SKILLS.map(s => `
     <div class="upgrade-node" data-skill="${s.id}">
@@ -108,11 +113,29 @@ for (const a of AMOUNTS) {
     el.amounts.appendChild(b);
 }
 
+// The parrot menu's Equipment tab, or the chest-opening window, the way the menu's own buttons open them.
+function openWindow(button) {
+    if (button.dataset.open === 'gear') {
+        game.openParrotMenuTab('gear');
+        return;
+    }
+    if (game.tryStartExpeditionChestTutorial?.() === true) return;
+    const c = game.getChestOpeningCounts(true);
+    const total = ['material', 'equipment'].reduce((n, kind) =>
+        n + ['common', 'uncommon', 'rare', 'epic', 'legendary'].reduce((m, r) => m + (c[kind]?.[r] || 0), 0), 0);
+    if (total > 0) game.chestOpeningUI.open(c);
+    else {
+        const r = button.getBoundingClientRect();
+        game.showDOMFloatText('No chests to open', r.left, r.top - 20);
+    }
+}
+
 // While the MAX button is hovered, the row previews spending everything (as the game's own MAX does).
 let hoverMax = null;
 page.addEventListener('click', e => {
-    const buy = e.target.closest('[data-buy]'), max = e.target.closest('[data-max]');
-    if (buy) spend(buy.dataset.buy, chosenAmount());
+    const buy = e.target.closest('[data-buy]'), max = e.target.closest('[data-max]'), win = e.target.closest('[data-open]');
+    if (win) openWindow(win);
+    else if (buy) spend(buy.dataset.buy, chosenAmount());
     else if (max) spend(max.dataset.max, available());
 });
 page.addEventListener('mouseover', e => {
@@ -135,6 +158,8 @@ function refresh() {
     badge.style.display = have > 0 ? 'flex' : 'none';
     if (page.style.display === 'none') return;
     setText(el.avail, fmt(have));
+    const chests = game.getTotalOpenableChestCount?.(true) || 0;
+    setText(el.chests, chests > 0 ? `(${fmt(chests)})` : '');
     for (const b of el.amounts.children) b.className = `birb-btn ${b.dataset.amount === settings.amount ? 'primary' : 'secondary'}`;
     const step = chosenAmount();
     for (const s of SKILLS) {
