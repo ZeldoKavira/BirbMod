@@ -7,7 +7,7 @@
 // whenever one tick waits longer than 0.1 s (5 s while the page is hidden).
 //
 // Log (birbmod.log): a line for every tick that drops more than 0.2 s, and a summary every minute.
-// F9 shows/hides the panel; drag it by its title.
+// Shown/hidden from Settings > Mods (or F9); drag it by its title. It keeps measuring while hidden.
 
 const WINDOW_SECONDS = 60;
 const DROP_LOG_SECONDS = 0.2;
@@ -184,11 +184,26 @@ title.addEventListener('mousedown', e => {
     window.addEventListener('mouseup', up, true);
 });
 
+const VISIBLE_KEY = 'birbmod_meter_visible';
+let visible = true;
+try { visible = JSON.parse(localStorage.getItem(VISIBLE_KEY)) !== false; } catch (e) { visible = true; }
+function setVisible(v) {
+    visible = !!v;
+    panel.style.display = visible ? '' : 'none';
+    try { localStorage.setItem(VISIBLE_KEY, JSON.stringify(visible)); } catch (e) { /* not saved */ }
+}
+setVisible(visible);
+mod.setting({
+    id: 'visible', section: 'Meter', label: 'Real-time income meter', type: 'toggle',
+    get: () => visible, set: setVisible, note: 'Net and gross income per real second, and dropped time. F9 also shows/hides it.',
+});
+
 const onKey = e => {
     if (e.key !== 'F9') return;
     e.preventDefault();
     e.stopPropagation();
-    panel.style.display = panel.style.display === 'none' ? '' : 'none';
+    setVisible(!visible);
+    window.BirbMod.settingsChanged();
 };
 window.addEventListener('keydown', onKey, true);
 mod.onUnload(() => window.removeEventListener('keydown', onKey, true));

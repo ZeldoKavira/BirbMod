@@ -1,4 +1,4 @@
-// Auto-buy, two toggles (both off until ticked; remembered between launches):
+// Auto-buy, two toggles on Settings > Mods (both off until turned on; remembered between launches):
 //
 //   Popcorn upgrades that pay back in under a minute - every second, buys the popcorn upgrade with the quickest payback
 //     (payback.js's estimate: cost / extra popcorn per real second) while it's under 60 s and affordable, then
@@ -21,7 +21,6 @@ const SHOP_IDS = [
     'm_ore_cap', 'm_ore_respawn', 'm_ore_value', 'm_more_ores', 'm_speed_ores',
 ];
 const KEY = 'birbmod_autobuy';
-const POS_KEY = 'birbmod_autobuy_pos';
 
 const um = game.upgradeManager;
 const proto = Object.getPrototypeOf(um);
@@ -109,60 +108,18 @@ function buySeeds() {
     }
 }
 
-// ---- panel ----
+// ---- on the Mods settings page ----
 
-const panel = document.createElement('div');
-panel.id = 'birbmod-autobuy';
-Object.assign(panel.style, {
-    position: 'fixed', zIndex: 99999, padding: '6px 8px 7px', minWidth: '250px',
-    background: 'rgba(14, 17, 27, 0.92)', border: '2px solid #333c57', borderRadius: '4px',
-    color: '#e5e7eb', font: '12px Galmuri11, monospace', userSelect: 'none', boxShadow: '0 4px 14px rgba(0,0,0,.5)',
+mod.setting({
+    id: 'popcorn', section: 'Auto-buy', label: 'Popcorn upgrades, payback < 1 min', type: 'toggle',
+    get: () => settings.popcorn,
+    set: v => { settings.popcorn = !!v; save(); mod.log(`auto-buy popcorn ${settings.popcorn ? 'on' : 'off'}`); },
 });
-let pos = { left: 200, top: 340 };
-try { pos = JSON.parse(localStorage.getItem(POS_KEY)) || pos; } catch (e) { /* default */ }
-panel.style.left = `${pos.left}px`;
-panel.style.top = `${pos.top}px`;
-panel.innerHTML = `
-    <div data-role="title" style="cursor:move;color:#94a3b8;margin-bottom:4px">Auto-buy</div>
-    <label style="display:flex;gap:6px;align-items:center;cursor:pointer">
-        <input type="checkbox" data-opt="popcorn"> Popcorn upgrades, payback &lt; 1 min
-    </label>
-    <label style="display:flex;gap:6px;align-items:center;cursor:pointer;margin-top:3px">
-        <input type="checkbox" data-opt="seeds"> Seed upgrades <span data-role="seedNote" style="color:#64748b"></span>
-    </label>`;
-document.body.appendChild(panel);
-mod.onUnload(() => panel.remove());
-
-for (const box of panel.querySelectorAll('[data-opt]')) {
-    box.checked = !!settings[box.dataset.opt];
-    box.addEventListener('change', () => {
-        settings[box.dataset.opt] = box.checked;
-        save();
-        mod.log(`auto-buy ${box.dataset.opt} ${box.checked ? 'on' : 'off'}`);
-    });
-}
-const seedNote = panel.querySelector('[data-role=seedNote]');
-function renderNote() {
-    seedNote.textContent = game.hasSunflowerUpgrade(FREE_SEEDS) ? '(free)' : "(needs Nature's Subsidy)";
-}
-
-for (const type of ['mousedown', 'mouseup', 'click', 'wheel', 'pointerdown', 'pointerup'])
-    panel.addEventListener(type, e => e.stopPropagation());
-
-const title = panel.querySelector('[data-role=title]');
-title.addEventListener('mousedown', e => {
-    const dx = e.clientX - panel.offsetLeft, dy = e.clientY - panel.offsetTop;
-    const move = ev => {
-        panel.style.left = `${Math.max(0, ev.clientX - dx)}px`;
-        panel.style.top = `${Math.max(0, ev.clientY - dy)}px`;
-    };
-    const up = () => {
-        window.removeEventListener('mousemove', move, true);
-        window.removeEventListener('mouseup', up, true);
-        try { localStorage.setItem(POS_KEY, JSON.stringify({ left: panel.offsetLeft, top: panel.offsetTop })); } catch (err) { /* fine */ }
-    };
-    window.addEventListener('mousemove', move, true);
-    window.addEventListener('mouseup', up, true);
+mod.setting({
+    id: 'seeds', section: 'Auto-buy', label: 'Seed upgrades', type: 'toggle',
+    get: () => settings.seeds,
+    set: v => { settings.seeds = !!v; save(); mod.log(`auto-buy seeds ${settings.seeds ? 'on' : 'off'}`); },
+    note: () => (game.hasSunflowerUpgrade(FREE_SEEDS) ? "Free with Nature's Subsidy." : "Waits for Nature's Subsidy (upgrades don't spend seeds)."),
 });
 
 // ---- run ----
@@ -173,9 +130,7 @@ const timer = setInterval(() => {
     try { buyPopcorn(); } catch (e) { mod.log(`popcorn auto-buy error: ${(e && e.stack) || e}`); }
     if (tick % 2 === 0) {
         try { buySeeds(); } catch (e) { mod.log(`seed auto-buy error: ${(e && e.stack) || e}`); }
-        renderNote();
     }
 }, 1000);
 mod.onUnload(() => clearInterval(timer));
-renderNote();
 mod.log(`auto-buy running (popcorn ${settings.popcorn ? 'on' : 'off'}, seeds ${settings.seeds ? 'on' : 'off'})`);

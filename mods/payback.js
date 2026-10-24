@@ -128,7 +128,22 @@ function compute() {
 
 // No hover tooltip of our own: the game already uses hover on these cards. Hovering MAX makes the game preview the
 // whole purchase on the buy button (total cost, target level), and then the label is that purchase's payback.
+const ON_KEY = 'birbmod_payback_on';
+let enabled = true;
+try { enabled = JSON.parse(localStorage.getItem(ON_KEY)) !== false; } catch (e) { enabled = true; }
+mod.setting({
+    id: 'labels', section: 'Popcorn upgrades', label: 'Payback time on buy buttons', type: 'toggle',
+    get: () => enabled,
+    set: v => {
+        enabled = !!v;
+        try { localStorage.setItem(ON_KEY, JSON.stringify(enabled)); } catch (e) { /* not saved */ }
+        if (!enabled) for (const t of document.querySelectorAll(`.${TAG}`)) t.remove();
+        else apply();
+    },
+});
+
 function apply() {
+    if (!enabled) return;
     observer.disconnect();
     try {
         for (const node of document.querySelectorAll('.upgrade-node[data-id]')) {

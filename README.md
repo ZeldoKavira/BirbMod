@@ -30,7 +30,7 @@ emote.json`;
 delete that file for a new token). Open it on a phone on the same network:
 
 - one finger taps and drags (the game gets a mouse), two fingers scroll
-- the bar has Tab, Esc, Space, Meter (F9) and Speed (F10)
+- the bar has Tab, Esc, Space, Meter (F9) and Mods (F10, the mod settings)
 - frames come from the page's own screencast and only run while a phone is watching (about 7 per second)
 
 Allow the launcher through Windows Firewall when asked. Away from home, use something like Tailscale on the PC and phone
@@ -51,12 +51,18 @@ A mod file is the body of `function(mod, game) { ... }`:
 - `mod.onUnload(fn)` registers cleanup; undo everything the mod changed there (restore wrapped functions, remove DOM,
   clear timers and listeners) so a reload leaves no trace.
 - `mod.log(text)` writes a line to `birbmod.log`.
+- `mod.setting({id, label, type: 'toggle' | 'choice', get, set, choices?, section?, note?})` adds an option to the Mods
+  page in the game's settings menu (settings.js draws it); it's removed when the mod unloads.
 
 `window.BirbMod` (the core) has `run(name, factory)`, `unload(name)`, `list()` and `game`.
 
 ## Mods
 
-- **meter.js** - real-time income meter (F9 shows/hides it, drag it by its title). Per real second over the last 60 s:
+All options are on **Settings > Mods** in the game (F10 opens it directly).
+
+- **settings.js** - adds the Mods button and page to the game's settings menu, in the game's own style.
+
+- **meter.js** - real-time income meter (on/off in Mods, or F9; drag it by its title). Per real second over the last 60 s:
   net (balance change) and gross (everything collected) for each currency, next to the game's own figure (gross per
   *simulated* second over 3 minutes, converted to per real second so it accounts for game speed). Also shows how much
   of the time that should have been simulated (real time x game speed) was, and how much the game
@@ -67,15 +73,16 @@ A mod file is the body of `function(mod, game) { ... }`:
   Popcorn Cap, Wing Training): the upgrade's cost divided by the extra popcorn per second it should bring, at your
   popcorn income over the last 60 real seconds. Value scales every pickup; spawn speed only helps while the meadow isn't
   full, wing speed and cap only while it is (the share of time it's full is measured). While MAX is hovered (the game
-  previews the whole purchase on the buy button), the label shows that purchase's payback, marked (max).
+  previews the whole purchase on the buy button), the label shows that purchase's payback, marked (max). Can be turned
+  off in Mods.
 
-- **autobuy.js** - an "Auto-buy" panel with two toggles (off until ticked, remembered between launches):
+- **autobuy.js** - two toggles in Mods (off until turned on, remembered between launches):
   *Popcorn upgrades, payback < 1 min* buys the popcorn upgrade with the quickest payback (payback.js's estimate) while
   it's under 60 s and affordable, re-checking after each level; *Seed upgrades* buys every level your seeds cover of each
   upgrade the game rates as free to buy, which is the seed-cost upgrades once Nature's Subsidy ("Upgrades don't spend
   seeds") is owned. Purchases go through the game's own upgrade manager.
 
-- **speed.js** - game speed control (F10 shows/hides it, drag it by its title): -/+ and 0.5x-10x presets, through the
+- **speed.js** - game speed in Mods (0.25x-10x), through the
   game's own `debugGameSpeedMultiplier`, which it clamps to 0.25x-10x. Remembered between launches; unloading the mod
   puts 1x back. Wall-clock timers (offline earnings, cultivation) don't speed up, and progress made faster still counts
   toward the stats the game reports to its leaderboards.

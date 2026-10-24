@@ -236,16 +236,33 @@ namespace BirbMod
             try { await DrainLog(cdp); } catch { /* closing */ }
         }
 
+        // Installed and the same version as the core in this launcher (an older one gets replaced).
         private static async Task<bool> CoreReady(Cdp cdp)
         {
             var v = await cdp.Eval("window.BirbMod && window.BirbMod.coreVersion || 0");
-            return Convert.ToInt32(v ?? 0) > 0;
+            return Convert.ToInt32(v ?? 0) == CoreVersion;
+        }
+
+        private static int CoreVersion
+        {
+            get
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(ReadCore(), @"CORE_VERSION\s*=\s*(\d+)");
+                return m.Success ? int.Parse(m.Groups[1].Value) : 1;
+            }
         }
 
         // The game object isn't global; its document visibilitychange listener closes over it. Walk that listener's
         // closure scopes for the object that has the game's state, hand it to the page, and install the core.
         private static async Task<bool> InstallCore(Cdp cdp)
         {
+            // An older core already holds the game: hand that over instead of searching again.
+            if (await cdp.Eval("!!(window.BirbMod && window.BirbMod.game)") is bool has && has)
+            {
+                await cdp.Eval("window.__birbGameHandoff = window.BirbMod.game, true"); // don't return the game object itself
+                Say($"Mod core {await cdp.Eval(ReadCore() + "\n//# sourceURL=birbmod/core.js")} (upgraded).");
+                return true;
+            }
             var listeners = await cdp.EvalHandle(
                 "(getEventListeners(document).visibilitychange || []).map(l => l.listener)", commandLineApi: true);
             if (listeners == null)
