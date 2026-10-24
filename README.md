@@ -48,6 +48,12 @@ A mod file is the body of `function(mod, game) { ... }`:
   dropped (a tick waiting longer than 0.1 s visible / 5 s hidden throws the rest away), and logs every drop over
   0.2 s plus a summary each minute.
 
+- **payback.js** - adds "~Xs payback" under the cost on the Popcorn tab's buy buttons (Popcorn Value, Faster Popcorns,
+  Popcorn Cap, Wing Training): the upgrade's cost divided by the extra popcorn per second it should bring, at your
+  popcorn income over the last 60 real seconds. Value scales every pickup; spawn speed only helps while the meadow isn't
+  full, wing speed and cap only while it is (the share of time it's full is measured). Hover the button for the numbers
+  behind the estimate.
+
 ## Security note
 
 The debug port listens on 127.0.0.1 only, uses a new random port each launch, and rejects connections from web pages
