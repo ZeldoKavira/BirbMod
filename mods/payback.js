@@ -73,7 +73,9 @@ function sample() {
 }
 
 function income() {
-    const shown = num(game.currencyRates && game.currencyRates.popcorn);
+    // The game's figure is per simulated second; payback is in real time, so scale it by the game speed.
+    const speed = Math.max(0.25, Math.min(10, Number(game.debugGameSpeedMultiplier) || 1));
+    const shown = num(game.currencyRates && game.currencyRates.popcorn) * speed;
     if (samples.length < 11) return { rate: shown, source: "the game's rate" };
     const a = samples[0], b = samples[samples.length - 1];
     const rate = (b.total - a.total) / Math.max(1, b.t - a.t);

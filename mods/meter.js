@@ -2,8 +2,9 @@
 //
 // The game's own "/s" is gross gains per *simulated* second over a 3-minute window, so it hides spending and any
 // real time the game skipped. This shows, per real second over the last 60 s: net (balance change) and gross
-// (everything collected), next to the game's figure; plus how much of real time was simulated and how much was
-// dropped. The game drops real time whenever one tick waits longer than 0.1 s (5 s while the page is hidden).
+// (everything collected), next to the game's figure converted to per real second; plus how much of the time that
+// should have been simulated (real time x game speed) was, and how much was dropped. The game drops real time
+// whenever one tick waits longer than 0.1 s (5 s while the page is hidden).
 //
 // Log (birbmod.log): a line for every tick that drops more than 0.2 s, and a summary every minute.
 // F9 shows/hides the panel; drag it by its title.
@@ -47,8 +48,10 @@ function fmt(n) {
 
 // ---- dropped time: wrap the game's logic tick ----
 
-const ticks = { real: 0, dropped: 0, drops: 0, maxGap: 0, ticks: 0 };
-const minute = { dropped: 0, drops: 0, maxGap: 0, ticks: 0, start: performance.now() / 1000, startSim: game.time };
+// expected: simulated seconds the ticks should have produced - each tick's real gap x the game speed then.
+const ticks = { real: 0, expected: 0, dropped: 0, drops: 0, maxGap: 0, ticks: 0 };
+const minute = { dropped: 0, drops: 0, maxGap: 0, ticks: 0, start: performance.now() / 1000, startSim: game.time, startExpected: 0 };
+const speedNow = () => Math.max(0.25, Math.min(10, Number(game.debugGameSpeedMultiplier) || 1)); // the game's own clamp
 const originalLogic = game.logicLoop;
 const tickWrapper = function () {
     const now = performance.now();
@@ -57,6 +60,7 @@ const tickWrapper = function () {
     const cap = hidden || game.backgroundLogicDeferred === true ? 5 : 0.1;
     ticks.ticks++; minute.ticks++;
     ticks.real += gap;
+    ticks.expected += gap * speedNow();
     if (gap > ticks.maxGap) ticks.maxGap = gap;
     if (gap > minute.maxGap) minute.maxGap = gap;
     if (gap > cap) {
@@ -102,7 +106,7 @@ mod.onUnload(() => {
 const samples = [];
 function sample() {
     attachGross(); // the game swaps in a fresh accumulator object now and then
-    const s = { t: performance.now() / 1000, sim: game.time, bal: {}, gross: {} };
+    const s = { t: performance.now() / 1000, sim: game.time, expected: ticks.expected, bal: {}, gross: {} };
     for (const [key, , get] of CURRENCIES) {
         try { s.bal[key] = toNum(get(game)); } catch (e) { s.bal[key] = 0; }
         s.gross[key] = gross[key] || 0;
@@ -116,7 +120,9 @@ function rates() {
     const a = samples[0], b = samples[samples.length - 1];
     const real = b.t - a.t;
     if (real <= 0) return null;
-    const out = { real, sim: b.sim - a.sim, rows: [] };
+    const out = { real, sim: b.sim - a.sim, expected: b.expected - a.expected, rows: [] };
+    // The game's figure is per simulated second; this many simulated seconds passed per real one.
+    const simPerReal = out.sim > 0 ? out.sim / real : speedNow();
     for (const [key, label] of CURRENCIES) {
         // Gross: counted gains, or (for currencies the game measures by balance) the positive balance steps.
         let g = b.gross[key] - a.gross[key];
@@ -125,7 +131,7 @@ function rates() {
             for (let i = 1; i < samples.length; i++) g += Math.max(0, samples[i].bal[key] - samples[i - 1].bal[key]);
         }
         const net = b.bal[key] - a.bal[key];
-        const shown = toNum(game.currencyRates && game.currencyRates[key]);
+        const shown = toNum(game.currencyRates && game.currencyRates[key]) * simPerReal;
         const badge = document.getElementById(`badge-${key}`);
         const visible = badge ? badge.style.display !== 'none' : false;
         if (!visible && g === 0 && net === 0 && shown === 0) continue;
@@ -197,7 +203,8 @@ function render() {
         body.textContent = 'Measuring...';
         return;
     }
-    const simPct = r.real > 0 ? (100 * r.sim) / r.real / Math.max(0.25, Number(game.debugGameSpeedMultiplier) || 1) : 100;
+    const simPct = r.expected > 0 ? (100 * r.sim) / r.expected : 100;
+    const speed = speedNow();
     const rows = r.rows.map(row => `<tr>
         <td style="white-space:nowrap">${row.label}</td>
         ${cell(`${row.net >= 0 ? '+' : ''}${fmt(row.net)}`, row.net > 0 ? '#22c55e' : row.net < 0 ? '#ef4444' : '#8b8b8b')}
@@ -210,7 +217,7 @@ function render() {
             <tr style="color:#64748b">${cell('per real s', null, 'left').replace('padding:0 0 0 10px;', '')}${cell('net')}${cell('gross')}${cell('game')}</tr>
             ${rows || `<tr><td colspan="4" style="color:#64748b">No income yet</td></tr>`}
         </table>
-        <div style="margin-top:4px;color:${timeColor}">Simulated ${simPct.toFixed(1)}% of real time</div>
+        <div style="margin-top:4px;color:${timeColor}">Simulated ${simPct.toFixed(1)}% of ${speed === 1 ? 'real time' : `real time x ${speed}`}</div>
         <div style="color:${ticks.dropped > 0 ? '#f59e0b' : '#64748b'}">Dropped ${ticks.dropped.toFixed(1)} s in ${ticks.drops} ticks; longest gap ${(ticks.maxGap * 1000).toFixed(0)} ms</div>`;
 }
 
@@ -219,12 +226,13 @@ function logMinute() {
     const now = performance.now() / 1000;
     const real = now - minute.start;
     const sim = game.time - minute.startSim;
+    const expected = ticks.expected - minute.startExpected;
     const r = rates();
     const income = r ? r.rows.filter(x => x.gross > 0 || x.net !== 0).map(x => `${x.key} net ${fmt(x.net)}/s gross ${fmt(x.gross)}/s game ${fmt(x.shown)}/s`).join(' | ') : '';
-    mod.log(`minute: real ${real.toFixed(1)} s, simulated ${sim.toFixed(1)} s (${((100 * sim) / Math.max(real, 0.001)).toFixed(1)}%), ` +
+    mod.log(`minute: real ${real.toFixed(1)} s at ${speedNow()}x, simulated ${sim.toFixed(1)} s of ${expected.toFixed(1)} s expected (${((100 * sim) / Math.max(expected, 0.001)).toFixed(1)}%), ` +
         `dropped ${minute.dropped.toFixed(2)} s in ${minute.drops} ticks, longest gap ${(minute.maxGap * 1000).toFixed(0)} ms, ${minute.ticks} ticks` +
         (income ? ` | ${income}` : ''));
-    Object.assign(minute, { dropped: 0, drops: 0, maxGap: 0, ticks: 0, start: now, startSim: game.time });
+    Object.assign(minute, { dropped: 0, drops: 0, maxGap: 0, ticks: 0, start: now, startSim: game.time, startExpected: ticks.expected });
 }
 
 sample();

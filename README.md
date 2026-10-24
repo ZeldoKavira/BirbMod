@@ -43,8 +43,9 @@ A mod file is the body of `function(mod, game) { ... }`:
 ## Mods
 
 - **meter.js** - real-time income meter (F9 shows/hides it, drag it by its title). Per real second over the last 60 s:
-  net (balance change) and gross (everything collected) for each currency, next to the game's own figure, which is
-  gross per *simulated* second over 3 minutes. Also shows how much of real time the game simulated and how much it
+  net (balance change) and gross (everything collected) for each currency, next to the game's own figure (gross per
+  *simulated* second over 3 minutes, converted to per real second so it accounts for game speed). Also shows how much
+  of the time that should have been simulated (real time x game speed) was, and how much the game
   dropped (a tick waiting longer than 0.1 s visible / 5 s hidden throws the rest away), and logs every drop over
   0.2 s plus a summary each minute.
 
