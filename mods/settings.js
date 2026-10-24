@@ -51,6 +51,7 @@ function openPage() {
 }
 
 function closePage(andMenu) {
+    sub = null;
     const page = document.getElementById(PAGE_ID);
     if (page) page.remove();
     const m = modal();
@@ -64,9 +65,42 @@ function closePage(andMenu) {
     }
 }
 
+// The 'page' option a sub-page is open for ("mod:id"), or null for the list. A 'page' option draws its own content
+// with renderPage(container, redraw); Back returns to the list.
+let sub = null;
+
+function renderSub(page, s) {
+    page.innerHTML = `
+        <div class="birb-modal-header"><h2>${esc(s.label)}</h2></div>
+        <div class="birb-modal-card" data-role="sub" style="padding: 16px 20px; max-height: 62vh; overflow-y: auto;"></div>
+        <div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">
+            <button type="button" data-nav="list" class="birb-btn secondary" style="padding:12px;">Back</button>
+            <button type="button" data-nav="close" class="birb-btn secondary" style="padding:12px;">Close</button>
+        </div>`;
+    const box = page.querySelector('[data-role=sub]');
+    try { s.renderPage(box, () => renderSub(page, s)); }
+    catch (e) { box.textContent = `Couldn't draw this page: ${e}`; }
+    page.onclick = e => {
+        const b = e.target.closest('button[data-nav]');
+        if (!b) return;
+        if (b.dataset.nav === 'list') { sub = null; render(); }
+        else closePage(true);
+    };
+}
+
 function render() {
     const page = document.getElementById(PAGE_ID);
     if (!page) return;
+    if (sub) {
+        const s = window.BirbMod.settings.find(x => `${x.mod}:${x.id}` === sub);
+        if (s) {
+            // Redraw only on a real change of options: the sub-page keeps its own state (scroll, filters) otherwise.
+            if (page.dataset.sub !== sub) { page.dataset.sub = sub; renderSub(page, s); }
+            return;
+        }
+        sub = null;
+    }
+    delete page.dataset.sub;
     const groups = new Map();
     for (const s of window.BirbMod.settings) {
         const key = s.section || s.mod;
@@ -86,6 +120,8 @@ function render() {
                         <button type="button" class="birb-btn ${c.value === value ? 'primary' : 'secondary'}" data-set="${esc(id)}" data-value="${esc(JSON.stringify(c.value))}"
                             style="flex:1 1 0; min-width:0; padding:8px 2px; font-size:13px;${c.value === value ? '' : 'opacity:.75;'}">${esc(c.label)}</button>`).join('')}
                     </div>`);
+            } else if (s.type === 'page') {
+                rows.push(`<button type="button" class="birb-btn primary" data-page="${esc(id)}" style="${btnCss}">${esc(s.label)} &rsaquo;</button>`);
             } else {
                 rows.push(`<button type="button" class="birb-btn primary" data-toggle="${esc(id)}" style="${btnCss}">${esc(s.label)}: ${onOff(value)}</button>`);
             }
@@ -113,6 +149,7 @@ function render() {
         const b = e.target.closest('button');
         if (!b) return;
         if (b.dataset.nav) return closePage(b.dataset.nav === 'close');
+        if (b.dataset.page) { sub = b.dataset.page; return render(); }
         const s = find(b.dataset.toggle || b.dataset.set);
         if (!s) return;
         try {

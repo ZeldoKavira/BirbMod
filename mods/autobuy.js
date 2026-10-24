@@ -29,9 +29,12 @@ const KEY = 'birbmod_autobuy';
 const um = game.upgradeManager;
 const proto = Object.getPrototypeOf(um);
 
-let settings = { popcorn: false, seeds: false, golden: 'off', silo: false, field: false, desert: false };
+let settings = { popcorn: false, seeds: false, golden: 'off', silo: false, field: 'off', desert: 'off', picked: [] };
 try { settings = Object.assign(settings, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { /* defaults */ }
 if (typeof settings.golden !== 'string') settings.golden = settings.golden ? 'payback' : 'off';
+for (const tree of ['field', 'desert'])
+    if (typeof settings[tree] !== 'string') settings[tree] = settings[tree] ? 'all' : 'off';
+if (!Array.isArray(settings.picked)) settings.picked = [];
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch (e) { /* not saved */ } };
 
 const level = id => proto.getUpgradeLevel.call(um, id);
@@ -188,8 +191,8 @@ function buyGolden() {
 }
 
 // ---- sunflower field trees ----
-// Every unlocked upgrade of the tree you can afford, in whatever it costs (seeds - free with Nature's Subsidy -, twigs,
-// fish, spirit trash...). The game's own purchase checks max level, parents, unlock requirements and the cost, and
+// Per tree: off, all, or only the upgrades picked on the "Choose sunflower upgrades" page. Buys every unlocked one of
+// those you can afford, in whatever it costs (seeds - free with Nature's Subsidy -, twigs, fish, spirit trash...). The game's own purchase checks max level, parents, unlock requirements and the cost, and
 // buys silently (no click sound or pop-ups). Passes repeat while something was bought, so children unlocked by a
 // purchase get bought too. Each purchase is logged by name.
 
@@ -232,11 +235,316 @@ const DESERT_IDS = [
     'd_desert_field_notes_plus', 'd_desert_muad_birb', 'd_desert_sandstorm', 'd_desert_golden_popcorn_x2'
 ];
 
-const sunflowerName = id => {
-    const key = `sunflowerUpgrades.${id}.name`;
-    try { const t = typeof window.t === 'function' ? window.t(key) : null; if (t && t !== key) return t; } catch (e) { /* fall back */ }
-    return id.replace(/^d_(desert_)?/, '').replace(/_/g, ' ');
+const SUNFLOWER_NAMES = {
+    d_sunflower_machine: "SUNFLOWER VENDING",
+    d_unlock_desert_tree: "UNLOCK THE DESERT TREE",
+    d_desert_core_mockup: "DESERT CORE",
+    d_desert_quest_merchant: "Quest Merchant",
+    d_desert_fever: "DESERT FEVER",
+    d_desert_expedition_points: "DESERT CAMPAIGN",
+    d_desert_golden_popcorn_chance_2: "SUNKISSED KERNELS",
+    d_desert_golden_popcorn_chance_3: "MIRAGE KERNELS",
+    d_desert_golden_popcorn_gain_2: "GOLD RUSH",
+    d_desert_popcorn_spawn_rate: "DUNE BLOOM",
+    d_desert_bloom_netting: "BLOOM NETTING",
+    d_desert_blossom_route: "BLOSSOM ROUTE",
+    d_desert_bloom_reservoir: "BLOOM RESERVOIR",
+    d_desert_aura_trail: "AURA TRAIL",
+    d_desert_dune_scouts: "DUNE SCOUTS",
+    d_desert_gourmet_golden_popcorn: "GOURMET GOLDEN POPCORN",
+    d_desert_bountiful_harvest: "BOUNTIFUL HARVEST",
+    d_desert_feathered_harvest: "FEATHERED HARVEST",
+    d_desert_golden_popcorn_chance_5: "GILDED DUNES",
+    d_desert_combat_regen_penalty: "DUNE VIGOR",
+    d_desert_golden_popcorn_chance_4: "AURIC GLINT",
+    d_desert_dave_golden_xp: "GILDED LESSONS",
+    d_desert_dave_popcorn_xp: "STEADY PECKING",
+    d_desert_seed_generation_x5: "DUNE FERTILIZER",
+    d_desert_auto_potion: "EMERGENCY FLASK",
+    d_desert_shiny_enemies: "AURIC ADVERSARIES",
+    d_seed_feeder: "SEED FEEDER",
+    d_seed_multiplier: "SEED FERTILIZER",
+    d_rebirth_playtime: "TIME IS MONEY",
+    d_golden_harvest: "GOLDEN HARVEST",
+    d_unlock_evolve: "UNLOCKS EVOLVE",
+    d_seed_synergy: "SEED SYNERGY",
+    d_butter_bonanza: "BUTTER BONANZA",
+    d_sparrow_snacks: "GOURMET SNACKS",
+    d_rainbow_aura: "RAINBOW AURA",
+    d_cheese_powder: "CHEESE FACTORY",
+    d_fishing_luck: "ANGLER'S BLESSING",
+    d_fast_reeling: "FAST REELING",
+    d_seagull_synergy: "SEAGULL SYNERGY",
+    d_popcorn_cap: "POPCORN SILO",
+    d_swift_wings: "SWIFT WINGS",
+    d_auto_gen: "AUTO GENERATOR",
+    d_faster_seeds: "EFFICIENT FARMING",
+    d_pickup_range: "VACUUM",
+    d_seed_multiplier_unlocker: "SEED MASTERY",
+    d_seed_pipeline: "SEED PIPELINE",
+    d_pop_max_lvl: "LIMIT BREAKER",
+    d_auto_fishing: "AUTO FISHING",
+    d_seagull_xp: "SEAGULL TRAINING",
+    d_fish_seeds: "FISH SEEDS",
+    d_seed_market: "MONETA STORE",
+    d_trophy_bonus: "TROPHY BONUS",
+    d_golden_rain: "GOLDEN CASCADE",
+    d_prism_shine: "PRISM SHINE",
+    d_platinum_wings: "PLATINUM WINGS",
+    d_deep_dive: "DEEP DIVE",
+    d_fish_frenzy: "FISH FRENZY",
+    d_sparrow_legacy: "SPARROW LEGACY",
+    d_sparrow_xp_2: "BIRD BRAIN",
+    d_free_seeds: "NATURE'S SUBSIDY",
+    d_unlock_rod_ancient: "ANCIENT JUNGLE",
+    d_unlock_rod_divine: "DIVINE",
+    d_unlock_rod_celestial: "BANANA",
+    d_sparrow_drain_power: "SPARROW RESONANCE",
+    d_sparrow_mitosis: "SPARROW MITOSIS",
+    d_double_catch: "DOUBLE CATCH",
+    d_double_fish_buff: "EXTRA STOMACH",
+    d_treasure_map: "MONETA CURRENT",
+    d_treasure_appraisal: "MONETA LEDGER",
+    d_fish_value: "MARKET BOOM",
+    d_rod_chance: "PRECISION CAST",
+    d_critical_reel: "CRITICAL CAST",
+    d_xp_tome: "EXPERT ANGLER",
+    d_bulk_bonus: "WHOLESALE",
+    d_profit_surge: "GOLDEN SALE",
+    d_treasure_seeker: "MONETA MASTERY",
+    d_shiny_scale: "PRISMATIC BADGE",
+    d_junk_repurpose: "COMPOST",
+    d_seed_bag: "FERTILE SOIL",
+    d_sparrow_hoard: "CARRIER PIGEON",
+    d_wing_mastery_plus: "WING MASTERY",
+    d_silo_mastery_plus: "SILO MASTERY",
+    d_butter_hose: "BUTTER HOSE",
+    d_focus_training: "FOCUS TRAINING",
+    d_quantum_corn: "QUANTUM CORN",
+    d_kernel_polish: "KERNEL POLISH",
+    d_sparrow_wisdom: "SPARROW WISDOM",
+    d_sparrow_lineage: "ANCESTRAL LINEAGE",
+    d_twig_popcorn_boost: "TWIG SYNERGY",
+    d_unlock_more_twigs: "TWIG MASTERY",
+    d_forest_bounty: "FOREST BOUNTY",
+    d_woodland_resonance: "WOODLAND RESONANCE",
+    d_forest_tree_damage: "SHARPENED CLAWS",
+    d_forest_chain_chop_plus: "CHAIN CHOP PLUS",
+    d_forest_max_trees: "FOREST EXPANSION",
+    d_sparrow_rebirb_preserve: "REBIRB PRESERVE",
+    d_golden_twig: "GOLDEN TWIG",
+    d_golden_twig_2: "GLORIOUS TWIGS",
+    d_feathered_help: "FEATHERED HELP",
+    d_feathered_synergy: "SPARROW COLLABORATION",
+    d_aurelian_resonance: "AURELIAN RESONANCE",
+    d_flock_synchrony: "FLOCK SYNCHRONY",
+    d_abyssal_light: "ABYSSAL LIGHT",
+    d_net_mastery: "NET MASTERY",
+    d_amber_alchemy: "AMBER CURRENT",
+    d_leviathan_mastery: "LEVIATHAN MASTERY",
+    d_ocean_bounty: "OCEAN'S BOUNTY",
+    d_gravity_field: "GRAVITY FIELD",
+    d_golden_butter: "GOLDEN BUTTER",
+    d_crit_pop: "CRITICAL POP",
+    d_void_silo: "VOID SILO",
+    d_hyper_metabolism: "HYPER METABOLISM",
+    d_hive_mind: "NEURAL OVERCLOCK",
+    d_phoenix_down: "PHOENIX DOWN",
+    d_seed_bank: "SEED BANK",
+    d_mecha_birb: "MECHA-BIRB",
+    d_ancestral_radio: "ANCESTRAL RADIO",
+    d_lunar_compass: "LUNAR COMPASS",
+    d_legend_beacon: "LEGEND BEACON",
+    d_migration_amplifier: "SEAGULL REBIRB AMPLIFIER",
+    d_gull_sonar: "GULL SONAR",
+    d_rare_routes: "RARE ROUTES",
+    d_echo_vectors: "ECHO VECTORS",
+    d_fleet_training: "FLEET TRAINING",
+    d_frenzy_reactor: "FRENZY REACTOR",
+    d_cold_start: "COLD START",
+    d_patrol_network: "PATROL NETWORK",
+    d_desert_golden_popcorn_chance: "GILDED KERNELS",
+    d_desert_seed_generation_x2: "SUNSPROUT IRRIGATION",
+    d_desert_rebirb_golden_feathers: "REBIRB MANIPULATION",
+    d_desert_rebirb_parrot_vitality: "VITAL PLUMAGE",
+    d_desert_field_notes: "FIELD NOTES",
+    d_desert_scout_gull: "SCOUT GULL",
+    d_desert_tackle_crate: "TACKLE CRATE",
+    d_desert_guarded_plumage: "GUARDED PLUMAGE",
+    d_desert_salvage_rights: "SALVAGE RIGHTS",
+    d_desert_signal_smoke: "SIGNAL SMOKE",
+    d_desert_auric_bargain: "AURIC BARGAIN",
+    d_desert_collared_dove: "DAVE",
+    d_desert_golden_popcorn_mult_unlock: "GILDED CATALYST",
+    d_desert_seed_generation_x2_plus: "DUNE FERTILITY",
+    d_desert_auric_blueprints: "AURIC BLUEPRINTS",
+    d_desert_oasis_recovery: "OASIS RECOVERY",
+    d_desert_popcorn_gain_x2: "SANDSTORM HARVEST",
+    d_desert_warpath: "DUNE WARPATH",
+    d_desert_field_notes_plus: "GILDED MARGINS",
+    d_desert_muad_birb: "MUAD'BIRB",
+    d_desert_sandstorm: "SANDSTORM",
+    d_desert_golden_popcorn_x2: "TREASURED HARVEST",
+    d_spirit_scouting: "SPIRIT SCOUTING",
+    d_spirit_shell: "SPIRIT SHELL",
+    d_spirit_momentum: "SPIRIT MOMENTUM",
 };
+const SUNFLOWER_DESCRIPTIONS = {
+    d_sunflower_machine: "Unlocks sunflower platform",
+    d_unlock_desert_tree: "Use a Legendary Key to unlock a new branch",
+    d_desert_core_mockup: "Desert popcorn has 5% chance to spawn as Golden Popcorn",
+    d_desert_quest_merchant: "Unlock the quest merchant.",
+    d_desert_fever: "Desert popcorn is worth 5x more.",
+    d_desert_expedition_points: "+100% Parrot skill points gained in Expedition.",
+    d_desert_golden_popcorn_chance_2: "+2.5% Desert Golden Popcorn chance.",
+    d_desert_golden_popcorn_chance_3: "+2.5% Desert Golden Popcorn chance.",
+    d_desert_golden_popcorn_gain_2: "1.5x Golden Popcorn gained.",
+    d_desert_popcorn_spawn_rate: "Seeds boost Golden Popcorn gained.",
+    d_desert_bloom_netting: "+15% Desert Popcorn spawn rate.",
+    d_desert_blossom_route: "+5% Spirit Aura chance from Expedition Loot.",
+    d_desert_bloom_reservoir: "1.35x Golden Popcorn gained.",
+    d_desert_aura_trail: "+25% Aura drop chance in Expeditions.",
+    d_desert_dune_scouts: "+50% Expedition Loot value.",
+    d_desert_gourmet_golden_popcorn: "Golden Popcorn has a 25% chance to be caramelized, granting 2x Golden Popcorn.",
+    d_desert_bountiful_harvest: "3x Golden Popcorn, 2x Seeds.",
+    d_desert_feathered_harvest: "Golden Feathers boost Golden Popcorn.",
+    d_desert_golden_popcorn_chance_5: "+2.5% Golden Popcorn chance.",
+    d_desert_combat_regen_penalty: "20% less Parrot combat regen penalty.",
+    d_desert_golden_popcorn_chance_4: "+2.5% Desert Golden Popcorn chance.",
+    d_desert_dave_golden_xp: "Dave gains 2x XP when collecting Golden Popcorn.",
+    d_desert_dave_popcorn_xp: "Dave gains 2x XP when collecting normal Popcorn.",
+    d_desert_seed_generation_x5: "Multiply sunflower seed generation by 2.",
+    d_desert_auto_potion: "Auto-use expedition potions when HP drops below a set threshold.",
+    d_desert_shiny_enemies: "Expedition enemies have a 1% chance to spawn Shiny.",
+    d_seed_feeder: "Auto-feed Sparrow using a chosen % of seed income",
+    d_seed_multiplier: "Feathers boost seeds",
+    d_rebirth_playtime: "Feathers x Playtime",
+    d_golden_harvest: "3x Seeds & Feathers",
+    d_unlock_evolve: "New Evolutions await",
+    d_seed_synergy: "Seeds boost Popcorn",
+    d_butter_bonanza: "+50% Butter Popcorn",
+    d_sparrow_snacks: "+50% Sparrow XP",
+    d_rainbow_aura: "2x Rainbow Popcorn",
+    d_cheese_powder: "+50% Cheese Popcorn",
+    d_fishing_luck: "+25% Fishing Luck",
+    d_fast_reeling: "-25% Reel Time",
+    d_seagull_synergy: "Fish XP buff affects Seagull",
+    d_popcorn_cap: "x2 Popcorn Cap",
+    d_swift_wings: "1.3x bird speed",
+    d_auto_gen: "Auto generate seeds",
+    d_faster_seeds: "2x Seed Speed",
+    d_pickup_range: "1.25x Pickup Range",
+    d_seed_multiplier_unlocker: "Unlocks seed upgrade",
+    d_seed_pipeline: "+25% Seed Speed",
+    d_pop_max_lvl: "+2 Pop. Mult Max Level",
+    d_auto_fishing: "Automate fishing",
+    d_seagull_xp: "+50% Seagull XP",
+    d_fish_seeds: "Unlock fish sales for Seeds; total Fish caught boost Seed production",
+    d_seed_market: "Highest Moneta held boosts Seeds from fish sales",
+    d_trophy_bonus: "Popcorn x Heaviest Fish Ever Caught",
+    d_golden_rain: "Gain 0.1% of your best completed Rebirb per second",
+    d_prism_shine: "+25% Popcorn value",
+    d_platinum_wings: "+15% movement speed",
+    d_deep_dive: "+20% rare fish chance",
+    d_fish_frenzy: "-20% fishing cooldown",
+    d_sparrow_legacy: "Evolution preserves 25% of Sparrow XP",
+    d_sparrow_xp_2: "-25% Seeds to feed / +25% XP gained",
+    d_free_seeds: "Upgrades don't spend seeds",
+    d_unlock_rod_ancient: "Unlocks Ancient Jungle",
+    d_unlock_rod_divine: "Unlocks Divine",
+    d_unlock_rod_celestial: "Unlocks Banana",
+    d_sparrow_drain_power: "Unlocks Resonance.",
+    d_sparrow_mitosis: "Unlocks Mitosis.",
+    d_double_catch: "10% chance 2 fish",
+    d_double_fish_buff: "Adds one more active fish buff slot",
+    d_treasure_map: "+50% Moneta per catch",
+    d_treasure_appraisal: "2x Moneta per catch",
+    d_fish_value: "Fish sell for 2x",
+    d_rod_chance: "+15% relative catch chance for Progression targets",
+    d_critical_reel: "10% chance of an instant catch",
+    d_xp_tome: "+50% Fishing XP",
+    d_bulk_bonus: "+20% Value when using Safe Sell",
+    d_profit_surge: "10% Chance for 10x Value",
+    d_treasure_seeker: "2x Moneta per catch",
+    d_shiny_scale: "+10% final Shiny chance per Highest Rod Tier",
+    d_junk_repurpose: "Junk sells for Moneta",
+    d_seed_bag: "+50% Global Seed Generation",
+    d_sparrow_hoard: "Sparrow collects 5x value",
+    d_wing_mastery_plus: "+10 Wing Training Levels",
+    d_silo_mastery_plus: "+10 Popcorn Cap Levels",
+    d_butter_hose: "x1.5 Popcorn Value",
+    d_focus_training: "x1.3 Pickup Radius",
+    d_quantum_corn: "x1.2 Spawn Rate",
+    d_kernel_polish: "x2 Popcorn Value",
+    d_sparrow_wisdom: "+50% Sparrow XP",
+    d_sparrow_lineage: "Legacy now preserves 50% of Sparrow XP",
+    d_twig_popcorn_boost: "Twigs multiplied by Popcorn",
+    d_unlock_more_twigs: "Unlocks twig upgrade",
+    d_forest_bounty: "3x Twigs",
+    d_woodland_resonance: "Wood boosts Twigs",
+    d_forest_tree_damage: "+1 tree damage",
+    d_forest_chain_chop_plus: "Chain chop hits one more tree",
+    d_forest_max_trees: "+15 Max Trees levels",
+    d_sparrow_rebirb_preserve: "Preserve 50% of Sparrow Rebirb multiplier",
+    d_golden_twig: "5% Chance for x100 Twigs",
+    d_golden_twig_2: "x2 Golden Twig Multiplier",
+    d_feathered_help: "Sparrows boost twig value (+1 Base Twig per Sparrow)",
+    d_feathered_synergy: "Double Feathered Help Effect",
+    d_aurelian_resonance: "Golden Twig multiplier and Chain chance",
+    d_flock_synchrony: "Global Twig multiplier scaled by Sparrows",
+    d_abyssal_light: "+50% Average Fish Weight",
+    d_net_mastery: "Auto-Fisher 10% chance for 2x fish",
+    d_amber_alchemy: "20% chance to gain 100x fish value in Seeds",
+    d_leviathan_mastery: "Fish Value scales with Weight squared",
+    d_ocean_bounty: "Catching fish grants Seeds",
+    d_gravity_field: "Passive Popcorn Pull (Weak)",
+    d_golden_butter: "Popcorn Value scales with Golden Feathers",
+    d_crit_pop: "1% Chance for Red Popcorn (100x)",
+    d_void_silo: "+10% Total Popcorn Capacity",
+    d_hyper_metabolism: "Popcorn grants stacking speed buff",
+    d_hive_mind: "Sparrow Speed Limit increased by 50%",
+    d_phoenix_down: "Sparrows keep XP on Evolution",
+    d_seed_bank: "+0.0167%/s of current Seeds (5T soft cap)",
+    d_mecha_birb: "Sparrows collect 2x Popcorn",
+    d_ancestral_radio: "Seagull -> Sparrow XP share 10%",
+    d_lunar_compass: "+35% weight for Seagull catches",
+    d_legend_beacon: "Daily legendary cooldown 24h->16h, daily shiny 1%->3%",
+    d_migration_amplifier: "+5% per level to Seagull Rebirb rare and XP effects only",
+    d_gull_sonar: "Seagull rolls twice and keeps the rarer catch",
+    d_rare_routes: "+15% rare-up reroll chance on seagull catches",
+    d_echo_vectors: "+10% duplicate-catch chance",
+    d_fleet_training: "+6% seagull XP per level",
+    d_frenzy_reactor: "Frenzy duration x1.5",
+    d_cold_start: "Frenzy cooldown x0.65",
+    d_patrol_network: "+1% duplicate-catch chance per level",
+    d_desert_golden_popcorn_chance: "+2.5% Desert Golden Popcorn chance.",
+    d_desert_seed_generation_x2: "Double sunflower seed generation.",
+    d_desert_rebirb_golden_feathers: "+100% Golden Feathers gained on Rebirb.",
+    d_desert_rebirb_parrot_vitality: "+25% Parrot Vitality gained in Expedition.",
+    d_desert_field_notes: "Gain 1 Parrot Skill Point per second, including offline.",
+    d_desert_scout_gull: "Send Seagulls to expedition fishing floors.",
+    d_desert_tackle_crate: "Dispatched seagull fishes 35% faster and rerolls weak catches.",
+    d_desert_guarded_plumage: "+15% Expedition parrot HP.",
+    d_desert_salvage_rights: "+25% Expedition Loot value.",
+    d_desert_signal_smoke: "1.5x Golden Popcorn gained.",
+    d_desert_auric_bargain: "Reduces the price of Golden Popcorn upgrades by 25%.",
+    d_desert_collared_dove: "Unlock a desert bird that scavenges popcorn in clustered swoops.",
+    d_desert_golden_popcorn_mult_unlock: "Unlock GOLDEN POPCORN MULT in the Rebirb Shop.",
+    d_desert_seed_generation_x2_plus: "Double the value of sunflower seeds.",
+    d_desert_auric_blueprints: "Unlock AURIC SILO in the Popcorn Shop.",
+    d_desert_oasis_recovery: "+10% Health Regen value per level.",
+    d_desert_popcorn_gain_x2: "Double Popcorn gained.",
+    d_desert_warpath: "+10% Expedition damage per level.",
+    d_desert_field_notes_plus: "+33.3% Golden Popcorn gained per level.",
+    d_desert_muad_birb: "Golden Popcorn boosts Expedition skill points.",
+    d_desert_sandstorm: "A sandstorm can occur on the desert, turning every popcorn into golden",
+    d_desert_golden_popcorn_x2: "Double Golden Popcorn gained in Desert.",
+    d_spirit_scouting: "+10% Parrot Damage per level",
+    d_spirit_shell: "+10% Parrot Max HP per level",
+    d_spirit_momentum: "+2% Parrot atk/move speed per level",
+};
+
+const sunflowerName = id => SUNFLOWER_NAMES[id] || id.replace(/^d_(desert_)?/, '').replace(/_/g, ' ');
 
 function buySunflowerTree(ids, label) {
     let bought = 0;
@@ -260,9 +568,83 @@ function buySunflowerTree(ids, label) {
     return bought;
 }
 
+function treeIds(tree) {
+    const ids = tree === 'desert' ? DESERT_IDS : FIELD_IDS;
+    const mode = settings[tree];
+    if (mode === 'all') return ids;
+    if (mode === 'selected') {
+        const picked = new Set(settings.picked);
+        return ids.filter(id => picked.has(id));
+    }
+    return [];
+}
+
 function buySunflowers() {
-    if (settings.field) buySunflowerTree(FIELD_IDS, 'sunflower field');
-    if (settings.desert) buySunflowerTree(DESERT_IDS, 'desert field');
+    const field = treeIds('field'), desert = treeIds('desert');
+    if (field.length) buySunflowerTree(field, 'sunflower field');
+    if (desert.length) buySunflowerTree(desert, 'desert field');
+}
+
+// ---- the chooser page ----
+
+let pickTree = 'field', showOwned = false;
+function status(id) {
+    let level = 0, unlocked = false;
+    try { level = um.getSunflowerLevel(id); unlocked = um.isSunflowerUpgradeUnlocked(id); } catch (e) { /* locked */ }
+    if (level > 0) return { text: `owned${level > 1 ? ` (lv ${level})` : ''}`, color: '#22c55e', available: unlocked };
+    return unlocked ? { text: 'available', color: '#facc15', available: true } : { text: 'locked', color: '#64748b', available: false };
+}
+
+function renderPicker(box, redraw) {
+    const ids = pickTree === 'desert' ? DESERT_IDS : FIELD_IDS;
+    const picked = new Set(settings.picked);
+    const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+    const tab = (tree, label) => `<button type="button" class="birb-btn ${pickTree === tree ? 'primary' : 'secondary'}" data-tree="${tree}"
+        style="flex:1; padding:8px; font-size:13px;${pickTree === tree ? '' : 'opacity:.75;'}">${label}</button>`;
+    const mode = settings[pickTree];
+    const shown = ids.filter(id => showOwned || um.getSunflowerLevel(id) === 0 || picked.has(id));
+    const rows = shown.map(id => {
+        const st = status(id);
+        return `<label style="display:flex;gap:8px;align-items:flex-start;padding:5px 2px;border-bottom:1px solid rgba(148,163,184,.15);cursor:pointer">
+            <input type="checkbox" data-pick="${id}" ${picked.has(id) ? 'checked' : ''} style="margin-top:3px">
+            <span style="flex:1;min-width:0">
+                <span style="font-size:13px">${esc(sunflowerName(id))}</span>
+                <span style="font-size:11px;color:${st.color};margin-left:6px">${st.text}</span>
+                <span style="display:block;font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(SUNFLOWER_DESCRIPTIONS[id] || '')}</span>
+            </span>
+        </label>`;
+    }).join('');
+    box.innerHTML = `
+        <div style="display:flex;gap:6px;margin-bottom:8px">${tab('field', 'Sunflower Field')}${tab('desert', 'Desert')}</div>
+        <div style="font-size:12px;color:#94a3b8;margin-bottom:8px">This tree's auto-buy is <b style="color:#e5e7eb">${mode === 'selected' ? 'Selected' : mode === 'all' ? 'All' : 'Off'}</b>${mode === 'selected' ? '' : ' - set it to Selected on the Mods page to buy only the ticked ones'}. ${ids.filter(id => picked.has(id)).length} ticked.</div>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+            <button type="button" class="birb-btn secondary" data-act="available" style="flex:1;padding:7px;font-size:12px">Tick all available</button>
+            <button type="button" class="birb-btn secondary" data-act="clear" style="flex:1;padding:7px;font-size:12px">Clear this tree</button>
+        </div>
+        <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:#94a3b8;margin-bottom:6px;cursor:pointer">
+            <input type="checkbox" data-owned ${showOwned ? 'checked' : ''}> Show owned upgrades (${ids.length - shown.length} hidden)
+        </label>
+        <div>${rows || '<div style="color:#94a3b8;font-size:12px">Everything in this tree is owned.</div>'}</div>`;
+    box.onchange = e => {
+        if (e.target.matches('[data-owned]')) { showOwned = e.target.checked; redraw(); return; }
+        const box2 = e.target.closest('[data-pick]');
+        if (!box2) return;
+        const set = new Set(settings.picked);
+        if (box2.checked) set.add(box2.dataset.pick); else set.delete(box2.dataset.pick);
+        settings.picked = [...set];
+        save();
+    };
+    box.onclick = e => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        if (b.dataset.tree) { pickTree = b.dataset.tree; redraw(); return; }
+        const set = new Set(settings.picked);
+        if (b.dataset.act === 'available') ids.filter(id => status(id).available).forEach(id => set.add(id));
+        if (b.dataset.act === 'clear') ids.forEach(id => set.delete(id));
+        settings.picked = [...set];
+        save();
+        redraw();
+    };
 }
 
 // ---- on the Mods settings page ----
@@ -278,16 +660,21 @@ mod.setting({
     set: v => { settings.seeds = !!v; save(); mod.log(`auto-buy seeds ${settings.seeds ? 'on' : 'off'}`); },
     note: () => (game.hasSunflowerUpgrade(FREE_SEEDS) ? "Free with Nature's Subsidy." : "Waits for Nature's Subsidy (upgrades don't spend seeds)."),
 });
+const treeChoices = [{ value: 'off', label: 'Off' }, { value: 'all', label: 'All' }, { value: 'selected', label: 'Selected' }];
 mod.setting({
-    id: 'field', section: 'Auto-buy', label: 'Sunflower Field upgrades', type: 'toggle',
+    id: 'field', section: 'Auto-buy', label: 'Sunflower Field upgrades', type: 'choice', choices: treeChoices,
     get: () => settings.field,
-    set: v => { settings.field = !!v; save(); mod.log(`auto-buy sunflower field ${settings.field ? 'on' : 'off'}`); },
-    note: 'Every unlocked one you can afford, whatever it costs.',
+    set: v => { settings.field = v; save(); mod.log(`auto-buy sunflower field: ${v}`); },
 });
 mod.setting({
-    id: 'desert', section: 'Auto-buy', label: 'Desert Sunflower Field upgrades', type: 'toggle',
+    id: 'desert', section: 'Auto-buy', label: 'Desert Sunflower Field upgrades', type: 'choice', choices: treeChoices,
     get: () => settings.desert,
-    set: v => { settings.desert = !!v; save(); mod.log(`auto-buy desert field ${settings.desert ? 'on' : 'off'}`); },
+    set: v => { settings.desert = v; save(); mod.log(`auto-buy desert field: ${v}`); },
+    note: 'Buys every unlocked one you can afford, whatever it costs. "Selected" buys only the ones ticked below.',
+});
+mod.setting({
+    id: 'pick', section: 'Auto-buy', label: 'Choose sunflower upgrades', type: 'page',
+    renderPage: renderPicker,
 });
 mod.setting({
     id: 'golden', section: 'Auto-buy', label: 'Golden Popcorn Value', type: 'choice',

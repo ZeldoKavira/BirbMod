@@ -92,14 +92,17 @@ All options are on **Settings > Mods** in the game (F10 opens it directly).
   previews the whole purchase on the buy button), the label shows that purchase's payback, marked (max). Can be turned
   off in Mods.
 
-- **autobuy.js** - two toggles in Mods (off until turned on, remembered between launches):
+- **autobuy.js** - auto-buy options in Mods (off until turned on, remembered between launches):
   *Popcorn upgrades, payback < 1 min* buys the popcorn upgrade with the quickest payback (payback.js's estimate) while
   it's under 60 s and affordable, re-checking after each level; *Seed upgrades* buys every level your seeds cover of each
   upgrade the game rates as free to buy, which is the seed-cost upgrades once Nature's Subsidy ("Upgrades don't spend
   seeds") is owned; *Golden Popcorn Value* off / by golden-popcorn payback < 1 min / whenever affordable; *Auric Silo*
   whenever affordable (it raises the popcorn cap but is paid in golden popcorn); *Sunflower Field* and *Desert
-  Sunflower Field* buy every unlocked upgrade of that tree you can afford, whatever it costs (each purchase is logged). Purchases go through the game's own
-  upgrade manager.
+  Sunflower Field* each Off / All / Selected - buys every unlocked upgrade of that tree (or only the ones ticked on
+  *Choose sunflower upgrades*) you can afford, whatever it costs, and logs each purchase. Purchases go through the
+  game's own upgrade manager.
+
+  Mods can add their own sub-page to the Mods screen with `mod.setting({type: 'page', label, renderPage(box, redraw)})`.
 
 - **speed.js** - game speed in Mods (0.25x-10x), through the
   game's own `debugGameSpeedMultiplier`, which it clamps to 0.25x-10x. Remembered between launches; unloading the mod
