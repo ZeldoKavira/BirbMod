@@ -97,7 +97,8 @@ All options are on **Settings > Mods** in the game (F10 opens it directly).
   it's under 60 s and affordable, re-checking after each level; *Seed upgrades* buys every level your seeds cover of each
   upgrade the game rates as free to buy, which is the seed-cost upgrades once Nature's Subsidy ("Upgrades don't spend
   seeds") is owned; *Golden Popcorn Value* off / by golden-popcorn payback < 1 min / whenever affordable; *Auric Silo*
-  whenever affordable (it raises the popcorn cap but is paid in golden popcorn); *Sunflower Field* and *Desert
+  whenever affordable (it raises the popcorn cap but is paid in golden popcorn); *Rebirb upgrades* every Rebirb-tab
+  upgrade (golden feathers) whenever affordable, cheapest first; *Sunflower Field* and *Desert
   Sunflower Field* each Off / All / Selected - buys every unlocked upgrade of that tree (or only the marked ones) you
   can afford, whatever it costs, and logs each purchase. Mark an upgrade by right-clicking it in the sunflower field
   (an AUTO badge shows on it; right-click again to unmark) or on *Choose sunflower upgrades*. With a tree on Selected,

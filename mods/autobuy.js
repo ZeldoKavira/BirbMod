@@ -9,6 +9,7 @@
 //
 //   Golden popcorn - Golden Popcorn Value by payback or whenever affordable, and Auric Silo whenever affordable
 //     (see below).
+//   Rebirb shop - every pr_ upgrade whenever affordable, cheapest first (see below).
 //   Sunflower Field and Desert Sunflower Field - every unlocked upgrade of that tree you can afford (see below).
 //
 // Purchases go through the game's own upgrade manager, so its rules (requirements, max levels) all apply.
@@ -29,7 +30,7 @@ const KEY = 'birbmod_autobuy';
 const um = game.upgradeManager;
 const proto = Object.getPrototypeOf(um);
 
-let settings = { popcorn: false, seeds: false, golden: 'off', silo: false, field: 'off', desert: 'off', picked: [] };
+let settings = { popcorn: false, seeds: false, golden: 'off', silo: false, rebirb: false, field: 'off', desert: 'off', picked: [] };
 try { settings = Object.assign(settings, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { /* defaults */ }
 if (typeof settings.golden !== 'string') settings.golden = settings.golden ? 'payback' : 'off';
 for (const tree of ['field', 'desert'])
@@ -187,6 +188,54 @@ function buyGolden() {
         mod.log(`bought ${boughtGolden} golden popcorn upgrade levels`);
         boughtGolden = 0;
         lastGoldenLog = performance.now();
+    }
+}
+
+// ---- rebirb shop ----
+// The Rebirb tab's upgrades (pr_..., paid in golden feathers, which have no other use): whenever affordable, cheapest
+// next level first. The ids the shop has today, plus any pr_ upgrade the save already has levels in.
+
+const REBIRB_IDS = ['pr_popcorn_mult', 'pr_radius_mult', 'pr_respawn_mult', 'pr_golden_popcorn_mult'];
+
+// Next level's cost in whatever it's paid in (the max-purchase preview, capped at one level, as if affordable).
+function nextLevelCost(id) {
+    const l = level(id);
+    if (l >= proto.getUpgradeMaxLevel.call(um, id)) return NaN;
+    um.getUpgradeMaxLevel = function (x) { return x === id ? l + 1 : proto.getUpgradeMaxLevel.call(um, x); };
+    um.getCurrency = function () { return 1e300; };
+    try {
+        const p = um.calculateMaxUpgradePreview(id);
+        return p ? Number(p.totalCost) : NaN;
+    } finally {
+        delete um.getUpgradeMaxLevel;
+        delete um.getCurrency;
+    }
+}
+
+let boughtRebirb = 0, lastRebirbLog = 0;
+function buyRebirb() {
+    if (!settings.rebirb) return;
+    const ids = [...new Set([...REBIRB_IDS, ...Object.keys(game.state.upgrades || {}).filter(id => id.startsWith('pr_'))])];
+    const skip = new Set();
+    let bought = 0;
+    for (let i = 0; i < MAX_BUYS_PER_TICK; i++) {
+        let best = null;
+        for (const id of ids) {
+            if (skip.has(id)) continue;
+            const cost = nextLevelCost(id);
+            if (cost >= 0 && (!best || cost < best.cost)) best = { id, cost };
+        }
+        if (!best) break;
+        const before = level(best.id);
+        um.purchaseUpgrade(best.id, true, true);
+        if (level(best.id) > before) {
+            bought++;
+            mod.log(`rebirb shop: bought ${best.id} level ${level(best.id)}`);
+        } else skip.add(best.id); // not affordable (or locked): try the next cheapest
+    }
+    if (bought > 0) {
+        boughtRebirb += bought;
+        refreshUi();
     }
 }
 
@@ -807,6 +856,15 @@ mod.setting({
 });
 const treeChoices = [{ value: 'off', label: 'Off' }, { value: 'all', label: 'All' }, { value: 'selected', label: 'Selected' }];
 mod.setting({
+    id: 'rebirb', section: 'Auto-buy', label: 'Rebirb upgrades whenever affordable', type: 'toggle',
+    get: () => settings.rebirb,
+    set: v => { settings.rebirb = !!v; save(); mod.log(`auto-buy rebirb shop ${settings.rebirb ? 'on' : 'off'}`); },
+    note: () => {
+        const open = REBIRB_IDS.map(id => ({ id, cost: nextLevelCost(id) })).filter(x => x.cost >= 0).sort((a, b) => a.cost - b.cost)[0];
+        return open ? `Cheapest next: ${open.id.replace(/^pr_/, '').replace(/_/g, ' ')} for ${game.formatNum(Math.round(open.cost))}.` : 'Everything in the Rebirb shop is maxed.';
+    },
+});
+mod.setting({
     id: 'field', section: 'Auto-buy', label: 'Sunflower Field upgrades', type: 'choice', choices: treeChoices,
     get: () => settings.field,
     set: v => { settings.field = v; save(); mod.log(`auto-buy sunflower field: ${v}`); },
@@ -845,6 +903,7 @@ const timer = setInterval(() => {
     tick++;
     try { buyPopcorn(); } catch (e) { mod.log(`popcorn auto-buy error: ${(e && e.stack) || e}`); }
     try { buyGolden(); } catch (e) { mod.log(`golden auto-buy error: ${(e && e.stack) || e}`); }
+    try { buyRebirb(); } catch (e) { mod.log(`rebirb auto-buy error: ${(e && e.stack) || e}`); }
     if (tick % 2 === 0) {
         try { buySeeds(); } catch (e) { mod.log(`seed auto-buy error: ${(e && e.stack) || e}`); }
     }
