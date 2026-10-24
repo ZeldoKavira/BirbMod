@@ -32,7 +32,7 @@ Then either run `BirbLauncher\bin\Release\BirbLauncher.exe`, or keep launching f
 options (Steam > Birb > Properties > Launch options) to:
 
 ```
-"C:\Users\bruta\Documents\Dev\BirbMod\BirbLauncher\bin\Release\BirbLauncher.exe" %command%
+"<path to BirbMod>\BirbLauncher\bin\Release\BirbLauncher.exe" %command%
 ```
 
 The launcher window stays open while the game runs; closing the game closes it. The mods' log is written to

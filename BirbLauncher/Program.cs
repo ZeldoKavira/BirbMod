@@ -47,6 +47,12 @@ namespace BirbMod
 
         private static async Task<int> Run(string[] args)
         {
+            // --check-update: only check for (and install) an update, then exit - the game isn't started or touched.
+            if (args.Contains("--check-update"))
+            {
+                Updater.UpdateAndRestart(args);
+                return 0;
+            }
             // Installed copies update themselves before starting the game (never while it's running through them).
             if (Process.GetProcessesByName("birb").Length == 0 && Updater.UpdateAndRestart(args))
                 return 0;
