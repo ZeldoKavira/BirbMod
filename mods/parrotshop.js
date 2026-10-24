@@ -28,9 +28,26 @@ const AMOUNTS = [
 ];
 
 const parrot = () => game.state.parrot;
+
+// The game keeps skill points as a number below Number.MAX_SAFE_INTEGER and as a whole-number string from there up
+// (its big-number store; "1e1000" stands for infinity). Read either; write back the same way the game does.
+function readPoints(v) {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+}
+function storePoints(big) {
+    if (big <= 0n) return 0;
+    return big >= BigInt(Number.MAX_SAFE_INTEGER) ? big.toString() : Number(big);
+}
+function subtractPoints(v, n) {
+    const taken = BigInt(Math.floor(n));
+    if (typeof v === 'string' && /^\d+$/.test(v.trim())) return storePoints(BigInt(v.trim()) - taken);
+    return storePoints(BigInt(Math.floor(readPoints(v))) - taken);
+}
+
 const available = () => {
     const p = parrot();
-    return p && typeof p.skillPoints === 'number' ? Math.max(0, Math.floor(p.skillPoints)) : 0;
+    return p ? Math.floor(readPoints(p.skillPoints)) : 0;
 };
 // Points one buy press spends at the chosen amount.
 function chosenAmount() {
@@ -42,14 +59,11 @@ function chosenAmount() {
 
 function spend(skill, points) {
     const p = parrot();
-    if (!p || typeof p.skillPoints !== 'number') {
-        mod.log('parrot skill points are not a plain number; not spending');
-        return;
-    }
+    if (!p) return;
     const n = Math.min(available(), Math.floor(points));
     if (n <= 0) return;
     p.skills[skill] = (p.skills[skill] || 0) + n;
-    p.skillPoints = Math.max(0, p.skillPoints - n);
+    p.skillPoints = subtractPoints(p.skillPoints, n);
     game.expeditionManager.refreshParrotBonuses(game.getEquippedArtifactNames(), game.getEquipmentMultipliers(), game.getEquippedArtifactInfusionLevels());
     game.requestSave();
     game.refreshParrotMenu?.();

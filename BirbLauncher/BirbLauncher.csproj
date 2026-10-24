@@ -6,7 +6,7 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>BirbLauncher</AssemblyName>
     <RootNamespace>BirbMod</RootNamespace>
-    <Version>0.2.10</Version>
+    <Version>0.2.11</Version>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
