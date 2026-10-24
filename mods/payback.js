@@ -179,6 +179,42 @@ for (const b of document.querySelectorAll('[data-birbmod-payback-title]')) {
     delete b.dataset.birbmodPaybackTitle;
 }
 
+// ---- for other mods (autobuy.js): the same estimate, without the shop needing to be open ----
+
+const protoMax = Object.getPrototypeOf(um).getUpgradeMaxLevel;
+const protoCurrency = Object.getPrototypeOf(um).getCurrency;
+
+// Cost of the next level: the game's own max-purchase preview, capped at one level and run as if you could afford
+// anything. Synchronous, and the shadowing is removed before returning; nothing is bought.
+function nextCost(id) {
+    const level = protoLevel.call(um, id);
+    if (level >= protoMax.call(um, id)) return NaN;
+    um.getUpgradeMaxLevel = function (x) { return x === id ? level + 1 : protoMax.call(um, x); };
+    um.getCurrency = function () { return 1e300; };
+    try {
+        const p = um.calculateMaxUpgradePreview(id);
+        return p ? num(p.totalCost) : NaN;
+    } finally {
+        delete um.getUpgradeMaxLevel;
+        delete um.getCurrency;
+    }
+}
+
+const api = {
+    ids: Object.keys(UPGRADES),
+    // { cost, extra (popcorn/s), seconds } for the next level, or null when there's nothing to gain.
+    estimate(id) {
+        if (!(id in UPGRADES)) return null;
+        const cost = nextCost(id);
+        const extra = gain(id, current.R, current.f);
+        if (!(extra > 0) || !Number.isFinite(cost)) return null;
+        return { cost, extra, seconds: cost / extra };
+    },
+    income: () => current.R,
+};
+window.BirbMod.payback = api;
+mod.onUnload(() => { if (window.BirbMod.payback === api) delete window.BirbMod.payback; });
+
 sample();
 compute();
 apply();

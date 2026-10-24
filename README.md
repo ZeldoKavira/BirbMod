@@ -25,7 +25,8 @@ The launcher window stays open while the game runs; closing the game closes it. 
 ## Play from your phone
 
 The launcher also serves the game live to a phone browser: it prints a link like
-`http://<pc-address>:8766/?t=<token>` when it starts (port and token in `%LOCALAPPDATA%\BirbModemote.json`;
+`http://<pc-address>:8766/?t=<token>` when it starts (port and token in `%LOCALAPPDATA%\BirbMod
+emote.json`;
 delete that file for a new token). Open it on a phone on the same network:
 
 - one finger taps and drags (the game gets a mouse), two fingers scroll
@@ -67,6 +68,12 @@ A mod file is the body of `function(mod, game) { ... }`:
   popcorn income over the last 60 real seconds. Value scales every pickup; spawn speed only helps while the meadow isn't
   full, wing speed and cap only while it is (the share of time it's full is measured). While MAX is hovered (the game
   previews the whole purchase on the buy button), the label shows that purchase's payback, marked (max).
+
+- **autobuy.js** - an "Auto-buy" panel with two toggles (off until ticked, remembered between launches):
+  *Popcorn upgrades, payback < 1 min* buys the popcorn upgrade with the quickest payback (payback.js's estimate) while
+  it's under 60 s and affordable, re-checking after each level; *Seed upgrades* buys every level your seeds cover of each
+  upgrade the game rates as free to buy, which is the seed-cost upgrades once Nature's Subsidy ("Upgrades don't spend
+  seeds") is owned. Purchases go through the game's own upgrade manager.
 
 - **speed.js** - game speed control (F10 shows/hides it, drag it by its title): -/+ and 0.5x-10x presets, through the
   game's own `debugGameSpeedMultiplier`, which it clamps to 0.25x-10x. Remembered between launches; unloading the mod
