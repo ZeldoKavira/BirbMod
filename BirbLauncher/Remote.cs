@@ -41,7 +41,11 @@ namespace BirbMod
 
         internal static void Start(string dataDir)
         {
-            LoadConfig(Path.Combine(dataDir, "remote.json"));
+            if (!LoadConfig(Path.Combine(dataDir, "remote.json")))
+            {
+                Log("Remote play is off (to play from a phone, set \"enabled\": true in %LOCALAPPDATA%\\BirbMod\\remote.json).");
+                return;
+            }
             using (var s = typeof(Remote).Assembly.GetManifestResourceStream("BirbMod.remote.html"))
             using (var r = new StreamReader(s, Encoding.UTF8))
                 _page = r.ReadToEnd();
@@ -62,13 +66,17 @@ namespace BirbMod
                 Log("  " + url);
         }
 
-        private static void LoadConfig(string path)
+        // Whether remote play is on. A new install starts with it off (no firewall prompt until it's wanted); a
+        // remote.json from before the switch existed keeps it on.
+        private static bool LoadConfig(string path)
         {
             Dictionary<string, object> cfg = null;
             try { cfg = Json.DeserializeObject(File.ReadAllText(path)) as Dictionary<string, object>; } catch { /* first run */ }
             _port = cfg != null && cfg.TryGetValue("port", out var p) ? Convert.ToInt32(p) : DefaultPort;
             _token = cfg != null && cfg.TryGetValue("token", out var t) && t is string ts && ts.Length >= 16 ? ts : NewToken();
-            File.WriteAllText(path, Json.Serialize(new Dictionary<string, object> { ["port"] = _port, ["token"] = _token }));
+            var enabled = cfg != null && (!cfg.TryGetValue("enabled", out var en) || en is bool b && b);
+            File.WriteAllText(path, Json.Serialize(new Dictionary<string, object> { ["enabled"] = enabled, ["port"] = _port, ["token"] = _token }));
+            return enabled;
         }
 
         private static string NewToken()

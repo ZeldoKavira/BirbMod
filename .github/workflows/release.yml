@@ -1,0 +1,43 @@
+name: release
+
+# Push a tag vX.Y.Z (matching <Version> in BirbLauncher.csproj) to build and publish BirbMod-vX.Y.Z.zip.
+# Installed launchers pick it up on their next start; install.ps1 always installs the latest.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches the launcher version
+        shell: pwsh
+        run: |
+          $version = ([xml](Get-Content BirbLauncher/BirbLauncher.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if ("v$version" -ne '${{ github.ref_name }}') { throw "Tag ${{ github.ref_name }} doesn't match BirbLauncher.csproj version $version" }
+
+      - name: Build
+        run: dotnet build BirbLauncher -c Release
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $out = Join-Path $PWD 'dist'
+          New-Item -ItemType Directory -Force (Join-Path $out 'mods') | Out-Null
+          Copy-Item BirbLauncher/bin/Release/BirbLauncher.exe, BirbLauncher/bin/Release/BirbLauncher.exe.config $out
+          Copy-Item mods/*.js (Join-Path $out 'mods')
+          '{"repo":"${{ github.repository }}"}' | Set-Content -Encoding ascii (Join-Path $out 'update.json')
+          # files.txt lists what this release installed, so the next update can remove files it drops.
+          $files = Get-ChildItem $out -Recurse -File | ForEach-Object { $_.FullName.Substring($out.Length + 1) }
+          ($files + 'files.txt') | Set-Content -Encoding ascii (Join-Path $out 'files.txt')
+          Compress-Archive -Path (Join-Path $out '*') -DestinationPath 'BirbMod-${{ github.ref_name }}.zip'
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create ${{ github.ref_name }} BirbMod-${{ github.ref_name }}.zip --title "BirbMod ${{ github.ref_name }}" --generate-notes

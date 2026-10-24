@@ -21,7 +21,6 @@ namespace BirbMod
     // Started while Birb is already running through this launcher, it re-attaches instead (port kept in session.json).
     internal static class Program
     {
-        private const string DefaultGame = @"C:\Program Files (x86)\Steam\steamapps\common\Birb\birb.exe";
         private static readonly string DataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BirbMod");
         private static readonly string LogPath = Path.Combine(DataDir, "birbmod.log");
         private static readonly string SessionPath = Path.Combine(DataDir, "session.json");
@@ -48,6 +47,10 @@ namespace BirbMod
 
         private static async Task<int> Run(string[] args)
         {
+            // Installed copies update themselves before starting the game (never while it's running through them).
+            if (Process.GetProcessesByName("birb").Length == 0 && Updater.UpdateAndRestart(args))
+                return 0;
+
             _modsDir = FindModsDir();
             Say($"Mods folder: {_modsDir}");
 
@@ -112,7 +115,7 @@ namespace BirbMod
                 return (null, 0);
             }
 
-            var exe = args.Length > 0 ? args[0] : DefaultGame;
+            var exe = args.Length > 0 ? args[0] : GameLocator.Find();
             if (!File.Exists(exe))
             {
                 Say($"Can't find the game at {exe}");

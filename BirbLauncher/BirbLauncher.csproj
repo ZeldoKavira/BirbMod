@@ -6,13 +6,15 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>BirbLauncher</AssemblyName>
     <RootNamespace>BirbMod</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
     <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
     <EmbeddedResource Include="core.js" LogicalName="BirbMod.core.js" />
     <EmbeddedResource Include="remote.html" LogicalName="BirbMod.remote.html" />
   </ItemGroup>
