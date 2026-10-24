@@ -9,6 +9,7 @@
 //
 //   Golden popcorn - Golden Popcorn Value by payback or whenever affordable, and Auric Silo whenever affordable
 //     (see below).
+//   Sunflower Field and Desert Sunflower Field - every unlocked upgrade of that tree you can afford (see below).
 //
 // Purchases go through the game's own upgrade manager, so its rules (requirements, max levels) all apply.
 
@@ -28,7 +29,7 @@ const KEY = 'birbmod_autobuy';
 const um = game.upgradeManager;
 const proto = Object.getPrototypeOf(um);
 
-let settings = { popcorn: false, seeds: false, golden: 'off', silo: false };
+let settings = { popcorn: false, seeds: false, golden: 'off', silo: false, field: false, desert: false };
 try { settings = Object.assign(settings, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { /* defaults */ }
 if (typeof settings.golden !== 'string') settings.golden = settings.golden ? 'payback' : 'off';
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch (e) { /* not saved */ } };
@@ -186,6 +187,84 @@ function buyGolden() {
     }
 }
 
+// ---- sunflower field trees ----
+// Every unlocked upgrade of the tree you can afford, in whatever it costs (seeds - free with Nature's Subsidy -, twigs,
+// fish, spirit trash...). The game's own purchase checks max level, parents, unlock requirements and the cost, and
+// buys silently (no click sound or pop-ups). Passes repeat while something was bought, so children unlocked by a
+// purchase get bought too. Each purchase is logged by name.
+
+const FIELD_IDS = [
+    'd_sunflower_machine', 'd_unlock_desert_tree', 'd_seed_feeder', 'd_seed_multiplier', 'd_rebirth_playtime',
+    'd_golden_harvest', 'd_unlock_evolve', 'd_seed_synergy', 'd_butter_bonanza', 'd_sparrow_snacks',
+    'd_rainbow_aura', 'd_cheese_powder', 'd_fishing_luck', 'd_fast_reeling', 'd_seagull_synergy', 'd_popcorn_cap',
+    'd_swift_wings', 'd_auto_gen', 'd_faster_seeds', 'd_pickup_range', 'd_seed_multiplier_unlocker',
+    'd_seed_pipeline', 'd_pop_max_lvl', 'd_auto_fishing', 'd_seagull_xp', 'd_fish_seeds', 'd_seed_market',
+    'd_trophy_bonus', 'd_golden_rain', 'd_prism_shine', 'd_platinum_wings', 'd_deep_dive', 'd_fish_frenzy',
+    'd_sparrow_legacy', 'd_sparrow_xp_2', 'd_free_seeds', 'd_unlock_rod_ancient', 'd_unlock_rod_divine',
+    'd_unlock_rod_celestial', 'd_sparrow_drain_power', 'd_sparrow_mitosis', 'd_double_catch', 'd_double_fish_buff',
+    'd_treasure_map', 'd_treasure_appraisal', 'd_fish_value', 'd_rod_chance', 'd_critical_reel', 'd_xp_tome',
+    'd_bulk_bonus', 'd_profit_surge', 'd_treasure_seeker', 'd_shiny_scale', 'd_junk_repurpose', 'd_seed_bag',
+    'd_sparrow_hoard', 'd_wing_mastery_plus', 'd_silo_mastery_plus', 'd_butter_hose', 'd_focus_training',
+    'd_quantum_corn', 'd_kernel_polish', 'd_sparrow_wisdom', 'd_sparrow_lineage', 'd_twig_popcorn_boost',
+    'd_unlock_more_twigs', 'd_forest_bounty', 'd_woodland_resonance', 'd_forest_tree_damage',
+    'd_forest_chain_chop_plus', 'd_forest_max_trees', 'd_sparrow_rebirb_preserve', 'd_golden_twig',
+    'd_golden_twig_2', 'd_feathered_help', 'd_feathered_synergy', 'd_aurelian_resonance', 'd_flock_synchrony',
+    'd_abyssal_light', 'd_net_mastery', 'd_amber_alchemy', 'd_leviathan_mastery', 'd_ocean_bounty',
+    'd_gravity_field', 'd_golden_butter', 'd_crit_pop', 'd_void_silo', 'd_hyper_metabolism', 'd_hive_mind',
+    'd_phoenix_down', 'd_seed_bank', 'd_mecha_birb', 'd_ancestral_radio', 'd_lunar_compass', 'd_legend_beacon',
+    'd_migration_amplifier', 'd_gull_sonar', 'd_rare_routes', 'd_echo_vectors', 'd_fleet_training',
+    'd_frenzy_reactor', 'd_cold_start', 'd_patrol_network', 'd_spirit_scouting', 'd_spirit_shell',
+    'd_spirit_momentum'
+];
+const DESERT_IDS = [
+    'd_desert_core_mockup', 'd_desert_quest_merchant', 'd_desert_fever', 'd_desert_expedition_points',
+    'd_desert_golden_popcorn_chance_2', 'd_desert_golden_popcorn_chance_3', 'd_desert_golden_popcorn_gain_2',
+    'd_desert_popcorn_spawn_rate', 'd_desert_bloom_netting', 'd_desert_blossom_route', 'd_desert_bloom_reservoir',
+    'd_desert_aura_trail', 'd_desert_dune_scouts', 'd_desert_gourmet_golden_popcorn', 'd_desert_bountiful_harvest',
+    'd_desert_feathered_harvest', 'd_desert_golden_popcorn_chance_5', 'd_desert_combat_regen_penalty',
+    'd_desert_golden_popcorn_chance_4', 'd_desert_dave_golden_xp', 'd_desert_dave_popcorn_xp',
+    'd_desert_seed_generation_x5', 'd_desert_auto_potion', 'd_desert_shiny_enemies',
+    'd_desert_golden_popcorn_chance', 'd_desert_seed_generation_x2', 'd_desert_rebirb_golden_feathers',
+    'd_desert_rebirb_parrot_vitality', 'd_desert_field_notes', 'd_desert_scout_gull', 'd_desert_tackle_crate',
+    'd_desert_guarded_plumage', 'd_desert_salvage_rights', 'd_desert_signal_smoke', 'd_desert_auric_bargain',
+    'd_desert_collared_dove', 'd_desert_golden_popcorn_mult_unlock', 'd_desert_seed_generation_x2_plus',
+    'd_desert_auric_blueprints', 'd_desert_oasis_recovery', 'd_desert_popcorn_gain_x2', 'd_desert_warpath',
+    'd_desert_field_notes_plus', 'd_desert_muad_birb', 'd_desert_sandstorm', 'd_desert_golden_popcorn_x2'
+];
+
+const sunflowerName = id => {
+    const key = `sunflowerUpgrades.${id}.name`;
+    try { const t = typeof window.t === 'function' ? window.t(key) : null; if (t && t !== key) return t; } catch (e) { /* fall back */ }
+    return id.replace(/^d_(desert_)?/, '').replace(/_/g, ' ');
+};
+
+function buySunflowerTree(ids, label) {
+    let bought = 0;
+    for (let pass = 0; pass < 5; pass++) {
+        let thisPass = 0;
+        for (const id of ids) {
+            let unlocked = false;
+            try { unlocked = um.isSunflowerUpgradeUnlocked(id); } catch (e) { unlocked = false; }
+            if (!unlocked) continue;
+            const before = um.getSunflowerLevel(id);
+            try { um.purchaseSunflowerUpgrade(id, true); } catch (e) { mod.log(`${label}: ${id} failed: ${e}`); continue; }
+            const after = um.getSunflowerLevel(id);
+            if (after > before) {
+                thisPass++;
+                mod.log(`${label}: bought ${sunflowerName(id)} (${id}) level ${after}`);
+            }
+        }
+        bought += thisPass;
+        if (thisPass === 0) break;
+    }
+    return bought;
+}
+
+function buySunflowers() {
+    if (settings.field) buySunflowerTree(FIELD_IDS, 'sunflower field');
+    if (settings.desert) buySunflowerTree(DESERT_IDS, 'desert field');
+}
+
 // ---- on the Mods settings page ----
 
 mod.setting({
@@ -198,6 +277,17 @@ mod.setting({
     get: () => settings.seeds,
     set: v => { settings.seeds = !!v; save(); mod.log(`auto-buy seeds ${settings.seeds ? 'on' : 'off'}`); },
     note: () => (game.hasSunflowerUpgrade(FREE_SEEDS) ? "Free with Nature's Subsidy." : "Waits for Nature's Subsidy (upgrades don't spend seeds)."),
+});
+mod.setting({
+    id: 'field', section: 'Auto-buy', label: 'Sunflower Field upgrades', type: 'toggle',
+    get: () => settings.field,
+    set: v => { settings.field = !!v; save(); mod.log(`auto-buy sunflower field ${settings.field ? 'on' : 'off'}`); },
+    note: 'Every unlocked one you can afford, whatever it costs.',
+});
+mod.setting({
+    id: 'desert', section: 'Auto-buy', label: 'Desert Sunflower Field upgrades', type: 'toggle',
+    get: () => settings.desert,
+    set: v => { settings.desert = !!v; save(); mod.log(`auto-buy desert field ${settings.desert ? 'on' : 'off'}`); },
 });
 mod.setting({
     id: 'golden', section: 'Auto-buy', label: 'Golden Popcorn Value', type: 'choice',
@@ -225,6 +315,9 @@ const timer = setInterval(() => {
     try { buyGolden(); } catch (e) { mod.log(`golden auto-buy error: ${(e && e.stack) || e}`); }
     if (tick % 2 === 0) {
         try { buySeeds(); } catch (e) { mod.log(`seed auto-buy error: ${(e && e.stack) || e}`); }
+    }
+    if (tick % 3 === 0) {
+        try { buySunflowers(); } catch (e) { mod.log(`sunflower auto-buy error: ${(e && e.stack) || e}`); }
     }
 }, 1000);
 mod.onUnload(() => clearInterval(timer));

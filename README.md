@@ -97,7 +97,8 @@ All options are on **Settings > Mods** in the game (F10 opens it directly).
   it's under 60 s and affordable, re-checking after each level; *Seed upgrades* buys every level your seeds cover of each
   upgrade the game rates as free to buy, which is the seed-cost upgrades once Nature's Subsidy ("Upgrades don't spend
   seeds") is owned; *Golden Popcorn Value* off / by golden-popcorn payback < 1 min / whenever affordable; *Auric Silo*
-  whenever affordable (it raises the popcorn cap but is paid in golden popcorn). Purchases go through the game's own
+  whenever affordable (it raises the popcorn cap but is paid in golden popcorn); *Sunflower Field* and *Desert
+  Sunflower Field* buy every unlocked upgrade of that tree you can afford, whatever it costs (each purchase is logged). Purchases go through the game's own
   upgrade manager.
 
 - **speed.js** - game speed in Mods (0.25x-10x), through the
