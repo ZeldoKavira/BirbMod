@@ -107,6 +107,11 @@ All options are on **Settings > Mods** in the game (F10 opens it directly).
 
   Mods can add their own sub-page to the Mods screen with `mod.setting({type: 'page', label, renderPage(box, redraw)})`.
 
+- **dungeon.js** - two options under *Dungeon* in Mods. *Parrot stats panel on runs* (on by default): while on an
+  expedition run, a panel with the parrot Overview tab's figures (level and XP, max health, damage, HP regen and
+  build points, each with base/bonus), drag it by its title. *Always show monster attack* (off by default): the attack
+  label the game only shows while Shift is held (sword icon and number), drawn over every monster's health bar.
+
 - **speed.js** - game speed in Mods (0.25x-10x), through the
   game's own `debugGameSpeedMultiplier`, which it clamps to 0.25x-10x. Remembered between launches; unloading the mod
   puts 1x back. Wall-clock timers (offline earnings, cultivation) don't speed up, and progress made faster still counts
