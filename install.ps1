@@ -22,8 +22,11 @@ $zip = Join-Path $env:TEMP $asset.name
 Write-Host "BirbMod: downloading $($release.tag_name)..."
 Invoke-WebRequest $asset.browser_download_url -OutFile $zip -UseBasicParsing
 
-# A running launcher holds its exe open; it'll be started again from the shortcut.
-Get-Process BirbLauncher -ErrorAction SilentlyContinue | Stop-Process -Force
+# A launcher running from this install holds its exe open; it'll be started again from the shortcut. (Copies
+# running from anywhere else are left alone.)
+Get-Process BirbLauncher -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -and $_.Path.StartsWith($app, [StringComparison]::OrdinalIgnoreCase) } |
+    Stop-Process -Force
 Start-Sleep -Milliseconds 500
 New-Item -ItemType Directory -Force $app | Out-Null
 Expand-Archive $zip -DestinationPath $app -Force
