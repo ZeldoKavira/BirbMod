@@ -51,8 +51,8 @@ A mod file is the body of `function(mod, game) { ... }`:
 - **payback.js** - adds "~Xs payback" under the cost on the Popcorn tab's buy buttons (Popcorn Value, Faster Popcorns,
   Popcorn Cap, Wing Training): the upgrade's cost divided by the extra popcorn per second it should bring, at your
   popcorn income over the last 60 real seconds. Value scales every pickup; spawn speed only helps while the meadow isn't
-  full, wing speed and cap only while it is (the share of time it's full is measured). Hover the button for the numbers
-  behind the estimate.
+  full, wing speed and cap only while it is (the share of time it's full is measured). While MAX is hovered (the game
+  previews the whole purchase on the buy button), the label shows that purchase's payback, marked (max).
 
 ## Security note
 

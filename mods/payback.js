@@ -7,7 +7,8 @@
 //   Faster Popcorns  R x (1 - f) x (interval now / next - 1)   - only helps while spawning is the limit
 //   Wing Training    R x f x (speed next / now - 1)            - only helps while collecting is the limit
 //   Popcorn Cap      R x f x (sqrt(cap next / now) - 1)        - a denser field means shorter flights between pickups
-// These are estimates (marked ~); hover the button for the numbers behind one.
+// These are estimates (marked ~). While MAX is hovered, the game previews the whole purchase on the buy button and
+// the label shows that purchase's payback, marked (max).
 
 const UPGRADES = {
     p_value: 'value',
@@ -85,26 +86,24 @@ function fullShare() {
 }
 
 // Extra popcorn per second from one more level, and how it was worked out.
-function gain(id, R, f) {
+// Extra popcorn per second from going from the current level to toLevel.
+function gain(id, R, f, toLevel) {
     const level = protoLevel.call(um, id);
-    const now = effectAt(id, level), next = effectAt(id, level + 1);
-    if (!(now > 0) || !(next > 0) || now === next) return { extra: 0, how: 'no change next level' };
+    const target = toLevel ?? level + 1;
+    const now = effectAt(id, level), next = effectAt(id, target);
+    if (!(now > 0) || !(next > 0) || now === next) return 0;
     switch (UPGRADES[id]) {
         case 'value': {
-            // The card's own figures (multipliers included), so the tooltip matches what the card shows.
+            // The card's own figures (multipliers included), as the card shows them.
             const shown = l => parseAmount(String(game.getShopUpgradeEffectHtml(id, l)).replace(/<[^>]*>/g, ''));
-            const a = shown(level), b = shown(level + 1);
-            const [v0, v1] = a > 0 && b > 0 ? [a, b] : [now, next];
-            return { extra: R * (v1 / v0 - 1), how: `value ${fmt(v0)} -> ${fmt(v1)}` };
+            const a = shown(level), b = shown(target);
+            return a > 0 && b > 0 ? R * (b / a - 1) : R * (next / now - 1);
         }
-        case 'speed':
-            return { extra: R * (1 - f) * (now / next - 1), how: `spawn ${now}s -> ${next}s, meadow full ${Math.round(100 * f)}% of the time` };
-        case 'move':
-            return { extra: R * f * (next / now - 1), how: `speed x${now.toFixed(2)} -> x${next.toFixed(2)}, meadow full ${Math.round(100 * f)}% of the time` };
-        case 'capacity':
-            return { extra: R * f * (Math.sqrt(next / now) - 1), how: `cap ${now} -> ${next}, meadow full ${Math.round(100 * f)}% of the time` };
+        case 'speed': return R * (1 - f) * (now / next - 1);
+        case 'move': return R * f * (next / now - 1);
+        case 'capacity': return R * f * (Math.sqrt(next / now) - 1);
     }
-    return { extra: 0, how: '' };
+    return 0;
 }
 
 function fmt(n) {
@@ -119,18 +118,14 @@ style.textContent = `.${TAG}{display:block;font-size:10px;line-height:1.1;opacit
 document.head.appendChild(style);
 mod.onUnload(() => style.remove());
 
-let cache = { at: 0, values: {} };
+let current = { R: 0, f: 0 };
 
 function compute() {
-    const { rate: R, source } = income();
-    const f = fullShare();
-    const values = {};
-    for (const id of Object.keys(UPGRADES)) {
-        try { values[id] = { ...gain(id, R, f), R, source }; } catch (e) { values[id] = null; }
-    }
-    cache = { at: performance.now(), values };
+    current = { R: income().rate, f: fullShare() };
 }
 
+// No hover tooltip of our own: the game already uses hover on these cards. Hovering MAX makes the game preview the
+// whole purchase on the buy button (total cost, target level), and then the label is that purchase's payback.
 function apply() {
     observer.disconnect();
     try {
@@ -141,34 +136,28 @@ function apply() {
             if (!btn) continue;
             let tag = btn.querySelector(`.${TAG}`);
             const amount = btn.querySelector('.btn-cost-amount');
-            const v = cache.values[id];
-            if (!amount || !v) {
+            if (!amount) {
                 if (tag) tag.remove();
                 continue;
             }
-            const cost = parseAmount(amount.textContent);
-            let text, title;
-            if (!(v.extra > 0) || !Number.isFinite(cost)) {
-                text = v.extra > 0 ? '' : 'no gain now';
-                title = `Payback: ${v.how}. At the moment this upgrade wouldn't add popcorn.`;
-            } else {
-                const secs = cost / v.extra;
-                text = `~${duration(secs)} payback`;
-                title = `Pays back in about ${duration(secs)}: +${fmt(v.extra)} popcorn/s for ${fmt(cost)}.\n` +
-                    `${v.how}. Income ${fmt(v.R)}/s (${v.source}).`;
-            }
+            let text = '';
+            try {
+                const preview = btn.hasAttribute('data-original-html') && typeof game.calculateMaxUpgradePreview === 'function'
+                    ? game.calculateMaxUpgradePreview(id) : null;
+                const cost = preview ? num(preview.totalCost) : parseAmount(amount.textContent);
+                const extra = gain(id, current.R, current.f, preview ? preview.targetLevel : undefined);
+                if (!(extra > 0)) text = 'no gain now';
+                else if (Number.isFinite(cost) && cost > 0) text = `~${duration(cost / extra)} payback${preview ? ' (max)' : ''}`;
+            } catch (e) { text = ''; }
             if (!tag) {
                 tag = document.createElement('span');
                 tag.className = TAG;
                 btn.appendChild(tag);
             }
             if (tag.textContent !== text) tag.textContent = text;
-            // The game resets the title on updates, so compare with what's on the button now.
-            btn.dataset.birbmodPaybackTitle = '1';
-            if (btn.title !== title) btn.title = title;
         }
     } finally {
-        observer.observe(document.body, { childList: true, subtree: true });
+        observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     }
 }
 
@@ -176,16 +165,17 @@ function apply() {
 const observer = new MutationObserver(() => {
     if (document.querySelector('.upgrade-node[data-id="p_value"], .upgrade-node[data-id="p_capacity"]')) apply();
 });
-observer.observe(document.body, { childList: true, subtree: true });
+observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 
 mod.onUnload(() => {
     observer.disconnect();
     for (const t of document.querySelectorAll(`.${TAG}`)) t.remove();
-    for (const b of document.querySelectorAll('[data-birbmod-payback-title]')) {
-        b.removeAttribute('title');
-        delete b.dataset.birbmodPaybackTitle;
-    }
 });
+// Titles an earlier version of this mod left on buttons.
+for (const b of document.querySelectorAll('[data-birbmod-payback-title]')) {
+    b.removeAttribute('title');
+    delete b.dataset.birbmodPaybackTitle;
+}
 
 sample();
 compute();
