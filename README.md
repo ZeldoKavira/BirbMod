@@ -120,7 +120,8 @@ All options are on **Settings > Mods** in the game (F10 opens it directly).
 
 - **speed.js** - game speed in Mods (0.25x-10x), through the
   game's own `debugGameSpeedMultiplier`, which it clamps to 0.25x-10x. Remembered between launches; unloading the mod
-  puts 1x back. Wall-clock timers (offline earnings, cultivation) don't speed up, and progress made faster still counts
+  puts 1x back. Boss and elite respawns (saved wall-clock deadlines) are moved so they follow it too; other wall-clock
+  timers (offline earnings, cultivation) don't speed up, and progress made faster still counts
   toward the stats the game reports to its leaderboards.
 
 ## Security note
