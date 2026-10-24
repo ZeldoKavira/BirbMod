@@ -54,6 +54,11 @@ A mod file is the body of `function(mod, game) { ... }`:
   full, wing speed and cap only while it is (the share of time it's full is measured). While MAX is hovered (the game
   previews the whole purchase on the buy button), the label shows that purchase's payback, marked (max).
 
+- **speed.js** - game speed control (F10 shows/hides it, drag it by its title): -/+ and 0.5x-10x presets, through the
+  game's own `debugGameSpeedMultiplier`, which it clamps to 0.25x-10x. Remembered between launches; unloading the mod
+  puts 1x back. Wall-clock timers (offline earnings, cultivation) don't speed up, and progress made faster still counts
+  toward the stats the game reports to its leaderboards.
+
 ## Security note
 
 The debug port listens on 127.0.0.1 only, uses a new random port each launch, and rejects connections from web pages
