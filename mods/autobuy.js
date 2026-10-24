@@ -1,4 +1,4 @@
-// Auto-buy, two toggles on Settings > Mods (both off until turned on; remembered between launches):
+// Auto-buy options on Settings > Mods (all off until turned on; remembered between launches):
 //
 //   Popcorn upgrades that pay back in under a minute - every second, buys the popcorn upgrade with the quickest payback
 //     (payback.js's estimate: cost / extra popcorn per real second) while it's under 60 s and affordable, then
@@ -191,7 +191,8 @@ function buyGolden() {
 }
 
 // ---- sunflower field trees ----
-// Per tree: off, all, or only the upgrades picked on the "Choose sunflower upgrades" page. Buys every unlocked one of
+// Per tree: off, all, or only the marked upgrades (right-click them in the field, or tick them on the "Choose
+// sunflower upgrades" page). Buys every unlocked one of
 // those you can afford, in whatever it costs (seeds - free with Nature's Subsidy -, twigs, fish, spirit trash...). The game's own purchase checks max level, parents, unlock requirements and the cost, and
 // buys silently (no click sound or pop-ups). Passes repeat while something was bought, so children unlocked by a
 // purchase get bought too. Each purchase is logged by name.
@@ -568,8 +569,22 @@ function buySunflowerTree(ids, label) {
     return bought;
 }
 
+// Which tree an upgrade belongs to, as the game decides it: the desert view shows d_desert_ and d_spirit_ upgrades,
+// the base view everything else except the mine's and the archivist's.
+function treeOf(id) {
+    if (id.startsWith('d_mine_') || id.startsWith('d_archivist_')) return null;
+    return id.startsWith('d_desert_') || id.startsWith('d_spirit_') ? 'desert' : 'field';
+}
+
+// All the upgrades of a tree: the game's own field stations, or the built-in lists before the field exists.
+function allOfTree(tree) {
+    const stations = game.sunflowerUpgradeStations || [];
+    const ids = [...new Set(stations.map(st => st.id))].filter(id => treeOf(id) === tree);
+    return ids.length ? ids : tree === 'desert' ? DESERT_IDS : FIELD_IDS;
+}
+
 function treeIds(tree) {
-    const ids = tree === 'desert' ? DESERT_IDS : FIELD_IDS;
+    const ids = allOfTree(tree);
     const mode = settings[tree];
     if (mode === 'all') return ids;
     if (mode === 'selected') {
@@ -585,6 +600,136 @@ function buySunflowers() {
     if (desert.length) buySunflowerTree(desert, 'desert field');
 }
 
+// ---- marking upgrades on the field itself ----
+// Right-click an upgrade in the sunflower field to mark it for auto-buy (again to unmark); marking sets that tree to
+// Selected. Marked ones get an "AUTO" badge drawn over the field. The game's own AUTO BUY then also skips unmarked
+// upgrades of a tree that's on Selected.
+
+function setPicked(id, on) {
+    const set = new Set(settings.picked);
+    if (on) set.add(id); else set.delete(id);
+    settings.picked = [...set];
+    const tree = treeOf(id);
+    if (on && tree && settings[tree] !== 'selected') {
+        settings[tree] = 'selected';
+        mod.log(`${tree} auto-buy set to Selected (an upgrade was marked on the field)`);
+    }
+    save();
+    window.BirbMod.settingsChanged();
+}
+
+// The field is on screen while the renderer keeps asking whether its upgrades are visible.
+let lastFieldDraw = 0;
+const originalVisible = game.renderCtxIsSunflowerUpgradeVisible;
+const visibleWrapper = id => { lastFieldDraw = performance.now(); return originalVisible(id); };
+if (typeof originalVisible === 'function') {
+    game.renderCtxIsSunflowerUpgradeVisible = visibleWrapper;
+    mod.onUnload(() => { if (game.renderCtxIsSunflowerUpgradeVisible === visibleWrapper) game.renderCtxIsSunflowerUpgradeVisible = originalVisible; });
+}
+const onField = () => performance.now() - lastFieldDraw < 300;
+const viewTree = () => (game.state.sunflowerTreeView === 'desert' ? 'desert' : 'field');
+
+// Screen <-> world, the game's own mapping (canvas box, logical screen size, zoom, camera).
+function screenScale() {
+    const c = game.canvas, r = c.getBoundingClientRect(), k = Math.max(1, Number(game.canvasRenderScale || 1));
+    const sw = Math.max(1, Number(game.screenWidth || c.width / k)), sh = Math.max(1, Number(game.screenHeight || c.height / k));
+    return { r, sx: r.width / sw, sy: r.height / sh };
+}
+function toWorld(cx, cy) {
+    const { r, sx, sy } = screenScale();
+    return { x: (cx - r.left) / sx / game.zoom + game.cameraX, y: (cy - r.top) / sy / game.zoom + game.cameraY };
+}
+function toClient(wx, wy) {
+    const { r, sx, sy } = screenScale();
+    return { x: r.left + (wx - game.cameraX) * game.zoom * sx, y: r.top + (wy - game.cameraY) * game.zoom * sy, scale: game.zoom * sx };
+}
+
+function stationAt(cx, cy) {
+    const w = toWorld(cx, cy), tree = viewTree();
+    for (const st of game.sunflowerUpgradeStations || []) {
+        if (treeOf(st.id) !== tree) continue;
+        let visible = false;
+        try { visible = game.isSunflowerUpgradeVisible(st.id); } catch (e) { visible = false; }
+        if (visible && w.x >= st.x && w.x <= st.x + st.width && w.y >= st.y && w.y <= st.y + st.height) return st;
+    }
+    return null;
+}
+
+const onContextMenu = e => {
+    if (!onField()) return;
+    const target = e.target;
+    if (!target || (target !== game.canvas && target.id !== 'game-area')) return;
+    const st = stationAt(e.clientX, e.clientY);
+    if (!st) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const on = !settings.picked.includes(st.id);
+    setPicked(st.id, on);
+    try { game.showFloatText(on ? 'Auto-buy: ON' : 'Auto-buy: OFF', st.x + st.width / 2, st.y - 6, on ? '#22c55e' : '#94a3b8'); } catch (err) { /* cosmetic */ }
+    mod.log(`${on ? 'marked' : 'unmarked'} ${sunflowerName(st.id)} (${st.id}) for auto-buy`);
+};
+window.addEventListener('contextmenu', onContextMenu, true);
+mod.onUnload(() => window.removeEventListener('contextmenu', onContextMenu, true));
+
+// AUTO badges over the marked upgrades, following the camera.
+const badges = document.createElement('div');
+badges.id = 'birbmod-autobuy-badges';
+// Just above the game canvas (z-index 10), below every game panel and window (1000s).
+Object.assign(badges.style, { position: 'fixed', left: '0', top: '0', width: '0', height: '0', zIndex: 11, pointerEvents: 'none' });
+document.body.appendChild(badges);
+mod.onUnload(() => badges.remove());
+const pool = [];
+function badge(i) {
+    if (!pool[i]) {
+        const b = document.createElement('div');
+        b.textContent = 'AUTO';
+        Object.assign(b.style, {
+            position: 'fixed', transform: 'translate(-100%, -40%)', padding: '1px 5px', borderRadius: '4px',
+            background: '#16a34a', color: '#fff', font: 'bold 10px Galmuri11, monospace', letterSpacing: '.04em',
+            boxShadow: '0 0 0 1px rgba(0,0,0,.45)', whiteSpace: 'nowrap',
+        });
+        badges.appendChild(b);
+        pool[i] = b;
+    }
+    return pool[i];
+}
+let frame = 0;
+function drawBadges() {
+    frame = requestAnimationFrame(drawBadges);
+    let n = 0;
+    if (onField() && settings.picked.length) {
+        const picked = new Set(settings.picked), tree = viewTree();
+        for (const st of game.sunflowerUpgradeStations || []) {
+            if (!picked.has(st.id) || treeOf(st.id) !== tree) continue;
+            let visible = false;
+            try { visible = game.isSunflowerUpgradeVisible(st.id); } catch (e) { visible = false; }
+            if (!visible) continue;
+            const c = toClient(st.x + st.width, st.y);
+            const b = badge(n++);
+            b.style.left = `${c.x}px`;
+            b.style.top = `${c.y}px`;
+            b.style.fontSize = `${Math.max(8, Math.min(13, 11 * c.scale))}px`;
+            b.style.display = '';
+        }
+    }
+    for (let i = n; i < pool.length; i++) pool[i].style.display = 'none';
+}
+frame = requestAnimationFrame(drawBadges);
+mod.onUnload(() => cancelAnimationFrame(frame));
+
+// The game's own AUTO BUY: in a tree set to Selected, only the marked upgrades.
+const adapter = game.nestManager && game.nestManager.game;
+const originalAuto = adapter && adapter.purchaseSunflowerUpgradeForAutomation;
+if (typeof originalAuto === 'function') {
+    const autoWrapper = function (id) {
+        const tree = treeOf(String(id));
+        if (tree && settings[tree] === 'selected' && !settings.picked.includes(id)) return false;
+        return originalAuto.apply(this, arguments);
+    };
+    adapter.purchaseSunflowerUpgradeForAutomation = autoWrapper;
+    mod.onUnload(() => { if (adapter.purchaseSunflowerUpgradeForAutomation === autoWrapper) adapter.purchaseSunflowerUpgradeForAutomation = originalAuto; });
+}
+
 // ---- the chooser page ----
 
 let pickTree = 'field', showOwned = false;
@@ -596,7 +741,7 @@ function status(id) {
 }
 
 function renderPicker(box, redraw) {
-    const ids = pickTree === 'desert' ? DESERT_IDS : FIELD_IDS;
+    const ids = allOfTree(pickTree);
     const picked = new Set(settings.picked);
     const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
     const tab = (tree, label) => `<button type="button" class="birb-btn ${pickTree === tree ? 'primary' : 'secondary'}" data-tree="${tree}"
@@ -670,7 +815,7 @@ mod.setting({
     id: 'desert', section: 'Auto-buy', label: 'Desert Sunflower Field upgrades', type: 'choice', choices: treeChoices,
     get: () => settings.desert,
     set: v => { settings.desert = v; save(); mod.log(`auto-buy desert field: ${v}`); },
-    note: 'Buys every unlocked one you can afford, whatever it costs. "Selected" buys only the ones ticked below.',
+    note: 'Buys every unlocked one you can afford, whatever it costs. "Selected" buys only marked ones: right-click an upgrade in the field to mark it (an AUTO badge shows), or tick it below. The game\'s own AUTO BUY follows the marks too.',
 });
 mod.setting({
     id: 'pick', section: 'Auto-buy', label: 'Choose sunflower upgrades', type: 'page',

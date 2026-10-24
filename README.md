@@ -98,8 +98,10 @@ All options are on **Settings > Mods** in the game (F10 opens it directly).
   upgrade the game rates as free to buy, which is the seed-cost upgrades once Nature's Subsidy ("Upgrades don't spend
   seeds") is owned; *Golden Popcorn Value* off / by golden-popcorn payback < 1 min / whenever affordable; *Auric Silo*
   whenever affordable (it raises the popcorn cap but is paid in golden popcorn); *Sunflower Field* and *Desert
-  Sunflower Field* each Off / All / Selected - buys every unlocked upgrade of that tree (or only the ones ticked on
-  *Choose sunflower upgrades*) you can afford, whatever it costs, and logs each purchase. Purchases go through the
+  Sunflower Field* each Off / All / Selected - buys every unlocked upgrade of that tree (or only the marked ones) you
+  can afford, whatever it costs, and logs each purchase. Mark an upgrade by right-clicking it in the sunflower field
+  (an AUTO badge shows on it; right-click again to unmark) or on *Choose sunflower upgrades*. With a tree on Selected,
+  the game's own AUTO BUY also only buys the marked ones. Purchases go through the
   game's own upgrade manager.
 
   Mods can add their own sub-page to the Mods screen with `mod.setting({type: 'page', label, renderPage(box, redraw)})`.
