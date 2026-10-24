@@ -216,6 +216,8 @@ namespace BirbMod
                 }
                 if (!loaded)
                 {
+                    var v = Updater.Current;
+                    await cdp.Eval($"window.BirbMod.launcherVersion = 'v{v.Major}.{v.Minor}.{Math.Max(0, v.Build)}'");
                     await LoadAllMods(cdp);
                     loaded = true;
                 }

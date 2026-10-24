@@ -103,6 +103,7 @@ function render() {
                 ${rows.join('') || '<div style="color:#94a3b8">No mod settings.</div>'}
             </div>
         </div>
+        ${window.BirbMod.launcherVersion ? `<div style="color:#64748b;font-size:12px;text-align:center;margin-top:10px">BirbMod ${esc(window.BirbMod.launcherVersion)}</div>` : ''}
         <div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">
             <button type="button" data-nav="back" class="birb-btn secondary" style="padding:12px;">Back</button>
             <button type="button" data-nav="close" class="birb-btn secondary" style="padding:12px;">Close</button>
