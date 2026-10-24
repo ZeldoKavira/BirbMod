@@ -55,6 +55,8 @@ namespace BirbMod
             if (process == null)
                 return 2;
 
+            Remote.Start(DataDir);
+
             var target = await WaitForPage(port, process);
             if (target == null)
             {
@@ -71,6 +73,7 @@ namespace BirbMod
                         using (var cdp = await Cdp.ConnectAsync(target))
                         {
                             Say("Connected to the game.");
+                            Remote.SetCdp(cdp);
                             await Serve(cdp, process);
                         }
                     }
@@ -382,7 +385,7 @@ namespace BirbMod
             return fallback;
         }
 
-        private static void Say(string text)
+        internal static void Say(string text)
         {
             var line = $"{DateTime.Now:HH:mm:ss} {text}";
             Console.WriteLine(line);

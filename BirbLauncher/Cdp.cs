@@ -24,6 +24,9 @@ namespace BirbMod
 
         internal bool IsOpen => _ws.State == WebSocketState.Open;
 
+        // Protocol events (method, params), raised on the reader thread: handlers must not wait on Call() there.
+        internal event Action<string, Dictionary<string, object>> Event;
+
         internal static async Task<Cdp> ConnectAsync(string url)
         {
             var cdp = new Cdp();
@@ -51,8 +54,18 @@ namespace BirbMod
                         } while (!r.EndOfMessage);
 
                         var msg = Json.DeserializeObject(Encoding.UTF8.GetString(ms.ToArray())) as Dictionary<string, object>;
-                        if (msg != null && msg.TryGetValue("id", out var id) && _pending.TryRemove(Convert.ToInt32(id), out var tcs))
-                            tcs.TrySetResult(msg);
+                        if (msg == null)
+                            continue;
+                        if (msg.TryGetValue("id", out var id))
+                        {
+                            if (_pending.TryRemove(Convert.ToInt32(id), out var tcs))
+                                tcs.TrySetResult(msg);
+                        }
+                        else if (msg.TryGetValue("method", out var method))
+                        {
+                            try { Event?.Invoke((string)method, msg.TryGetValue("params", out var p) ? p as Dictionary<string, object> : null); }
+                            catch { /* a handler's problem, not the connection's */ }
+                        }
                     }
                 }
             }

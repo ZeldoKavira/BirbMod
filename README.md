@@ -22,6 +22,19 @@ options (Steam > Birb > Properties > Launch options) to:
 The launcher window stays open while the game runs; closing the game closes it. The mods' log is written to
 `%LOCALAPPDATA%\BirbMod\birbmod.log`.
 
+## Play from your phone
+
+The launcher also serves the game live to a phone browser: it prints a link like
+`http://<pc-address>:8766/?t=<token>` when it starts (port and token in `%LOCALAPPDATA%\BirbModemote.json`;
+delete that file for a new token). Open it on a phone on the same network:
+
+- one finger taps and drags (the game gets a mouse), two fingers scroll
+- the bar has Tab, Esc, Space, Meter (F9) and Speed (F10)
+- frames come from the page's own screencast and only run while a phone is watching (about 7 per second)
+
+Allow the launcher through Windows Firewall when asked. Away from home, use something like Tailscale on the PC and phone
+rather than opening the port on your router: the page is plain HTTP, protected only by the token.
+
 ## Hot reload
 
 - Save a file in `mods/` and it's unloaded and reloaded in the running game within about half a second.
