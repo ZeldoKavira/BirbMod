@@ -1,5 +1,5 @@
 // A PARROT tab in the shop sidebar (next to POPCORN / REBIRB / SEEDS / NEST) for spending the parrot's skill points
-// without opening the parrot menu, with buttons that open the parrot's Equipment tab and the chest-opening window:
+// without opening the parrot menu, with buttons that open the equipment forge and the chest-opening window:
 // Vitality, Recovery and Strength, each with a buy button for the chosen amount
 // (1 point or a share of what's available) and a MAX button that spends everything on it. The tab's badge shows the
 // points waiting to be spent. On/off from Settings > Mods.
@@ -79,7 +79,7 @@ page.innerHTML = `
         <span data-v="avail" style="font-size:20px;color:#f1c40f;font-family:var(--font-pixel-mono)">0</span>
     </div>
     <div style="display:flex;gap:4px;margin-bottom:8px">
-        <button class="birb-btn secondary" data-open="gear" style="flex:1 1 0;padding:6px 0;font-size:14px;font-family:var(--font-pixel-mono)">EQUIPMENT</button>
+        <button class="birb-btn secondary" data-open="forge" style="flex:1 1 0;padding:6px 0;font-size:14px;font-family:var(--font-pixel-mono)">FORGE</button>
         <button class="birb-btn secondary" data-open="chests" style="flex:1 1 0;padding:6px 0;font-size:14px;font-family:var(--font-pixel-mono)">CHESTS <span data-v="chests"></span></button>
     </div>
     <div data-v="amounts" style="display:flex;gap:4px;margin-bottom:8px"></div>
@@ -113,10 +113,14 @@ for (const a of AMOUNTS) {
     el.amounts.appendChild(b);
 }
 
-// The parrot menu's Equipment tab, or the chest-opening window, the way the menu's own buttons open them.
+// The equipment forge or the chest-opening window, the way the parrot menu's Equipment tab buttons open them.
 function openWindow(button) {
-    if (button.dataset.open === 'gear') {
-        game.openParrotMenuTab('gear');
+    if (button.dataset.open === 'forge') {
+        if (game.isParrotForgeUnlocked?.() === true && game.state.parrot) game.parrotForgeUI.open();
+        else {
+            const r = button.getBoundingClientRect();
+            game.showDOMFloatText('The forge is not unlocked yet', r.left, r.top - 20);
+        }
         return;
     }
     if (game.tryStartExpeditionChestTutorial?.() === true) return;
