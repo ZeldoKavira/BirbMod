@@ -1,13 +1,14 @@
-// No time limit on the giant ore. Taking the minecart down to a mine area's giant ore normally gives 60 seconds to
-// break it before the cave collapses and sends you back. With this on, the giant ore never collapses: the cart ride
-// back is still there for when you want to leave. On/off from Settings > Mods.
-//
-// The game's mine journey sets a wall-clock deadline (Date.now() + 60 s) when the cart arrives at the giant ore; its
-// update() starts the collapse once the clock passes it, and damage only counts before it. This mod keeps that deadline
-// at infinity while you're in the giant ore's room, and hides the countdown the ore's health bar draws under it.
+// Minecart timers, each on/off from Settings > Mods:
+// - No minecart cooldown (on by default): after a giant ore is beaten, the cart shows a countdown and won't take you
+//   to the next one until it ends. The game keeps it as a saved wall-clock time (state.mine.bossRespawnAt, set on each
+//   win and read only by the cart); this mod clears it, so the cart is ready again as soon as you're back.
+// - No time limit on giant ores (off by default): the cart normally gives 60 seconds to break a giant ore before the
+//   cave collapses. The game's mine journey sets that as a wall-clock deadline when the cart arrives; its update()
+//   starts the collapse once the clock passes it, and damage only counts before it. This keeps that deadline at
+//   infinity while you're in the giant ore's room, and hides the countdown the ore's health bar draws under it.
 
 const KEY = 'birbmod_mine';
-let settings = { noTimer: true };
+let settings = { noCooldown: true, noOreLimit: false };
 try { settings = Object.assign(settings, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { /* defaults */ }
 function save() {
     try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch (e) { /* not saved */ }
@@ -29,10 +30,10 @@ function giveBackTimer() {
 if (journey && typeof journey.update === 'function') {
     const update = Object.getPrototypeOf(journey).update;
     journey.update = function () {
-        if (settings.noTimer && fighting(this)) this.deadline = Infinity;
+        if (settings.noOreLimit && fighting(this)) this.deadline = Infinity;
         const result = update.apply(this, arguments);
         // The deadline is set at the end of the update the cart arrives in.
-        if (settings.noTimer && fighting(this)) this.deadline = Infinity;
+        if (settings.noOreLimit && fighting(this)) this.deadline = Infinity;
         return result;
     };
 } else {
@@ -54,17 +55,33 @@ for (const kit of kits) {
     };
 }
 
+// The cooldown is only ever set when a giant ore is beaten (the cart is out of the room by the time it would show).
+const clearCooldown = setInterval(() => {
+    const m = game.state?.mine;
+    if (settings.noCooldown && m && Number(m.bossRespawnAt) > 0) {
+        m.bossRespawnAt = 0;
+        game.requestSave?.();
+    }
+}, 250);
+
 mod.onUnload(() => {
+    clearInterval(clearCooldown);
     if (journey) delete journey.update;
     for (const kit of kits) delete kit.render;
     giveBackTimer();
 });
 
 mod.setting({
-    id: 'noTimer', section: 'Mine', label: 'No time limit on giant ores', type: 'toggle',
-    get: () => settings.noTimer,
-    set: v => { settings.noTimer = !!v; save(); if (!settings.noTimer) giveBackTimer(); },
+    id: 'noCooldown', section: 'Mine', label: 'No minecart cooldown', type: 'toggle',
+    get: () => settings.noCooldown,
+    set: v => { settings.noCooldown = !!v; save(); },
+    note: 'The cart is ready for the next giant ore right after you beat one, without the countdown.',
+});
+mod.setting({
+    id: 'noOreLimit', section: 'Mine', label: 'No time limit on giant ores', type: 'toggle',
+    get: () => settings.noOreLimit,
+    set: v => { settings.noOreLimit = !!v; save(); if (!settings.noOreLimit) giveBackTimer(); },
     note: 'The minecart challenge\'s 60 s limit is removed; ride the cart back when you want to leave.',
 });
 
-mod.log(`giant ore time limit ${settings.noTimer ? 'removed' : 'kept'}`);
+mod.log(`minecart cooldown ${settings.noCooldown ? 'removed' : 'kept'}, giant ore time limit ${settings.noOreLimit ? 'removed' : 'kept'}`);

@@ -118,10 +118,11 @@ All options are on **Settings > Mods** in the game (F10 opens it directly).
   waiting to be spent. FORGE opens the equipment forge and CHESTS (with the openable count) opens the
   chest-opening window.
 
-- **mine.js** - *No time limit on giant ores* under *Mine* in Mods (on by default): the minecart challenge's 60-second
-  limit on breaking a mine area's giant ore is removed, so the cave never collapses; ride the cart back when you want
-  to leave. The countdown under the giant ore's health bar is hidden while it's on. Turning it off mid-fight gives a
-  fresh 60 seconds.
+- **mine.js** - two options under *Mine* in Mods. *No minecart cooldown* (on by default): after you beat a giant ore,
+  the cart is ready to take you to the next one straight away instead of counting down. *No time limit on giant ores*
+  (off by default): the minecart challenge's 60-second limit on breaking a giant ore is removed, so the cave never
+  collapses; ride the cart back when you want to leave. The countdown under the giant ore's health bar is hidden while
+  it's on, and turning it off mid-fight gives a fresh 60 seconds.
 
 - **speed.js** - game speed in Mods (0.25x-10x), through the
   game's own `debugGameSpeedMultiplier`, which it clamps to 0.25x-10x. Remembered between launches; unloading the mod
